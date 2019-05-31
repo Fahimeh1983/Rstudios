@@ -46,14 +46,25 @@ short_markers_list <- c("Npy", "Npy1r", "Npy2r", "Npy5r",
                         "Nts", "Ntsr1", "Ntsr2", 
                         "Nmb", "Nmbr")
 
-#counts <- intron[short_markers_list, FACS.cells] + exon[short_markers_list, FACS.cells]
-FACS.cells <- rownames(FACS.counts)
-FACS.counts <- FACS.counts[FACS.cells,short_markers_list]
+
+#Removing all low quality cells from FACS data
+LowQ_types <- c("Low Quality VISp L5 PT Ctxn3 2", "Batch Grouping VISp L5 PT Chrna6",
+                "Batch Grouping VISp L5 PT Ctxn3", "Low Quality VISp L6 CT Ptprt_2",
+                "Low Quality VISp L5 PT Ctxn3 1", "Doublet SMC and Glutamatergic", 
+                "Doublet Astro Aqp4 Ex", "Low Quality ALM L6 CT Cpa6", 
+                "Low Quality Meis2 Adamts19 ", "Doublet Endo and Peri_1",
+                "Doublet VISp L5 NP and L6 CT", "Low Quality Sst Chodl", 
+                "Low Quality Astro Aqp4" , "Doublet Endo Peri SMC", 
+                "Low Quality L4 Rspo1", "High Intronic VISp L5 Endou",
+                "Low Quality VISp L6 CT Ptprt_1")
+
+select.cl <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
+FACS.anno <- FACS.anno[FACS.anno$cluster_label %in% select.cl,]
 rownames(FACS.anno) <- FACS.anno$sample_name
-FACS.anno <- FACS.anno[FACS.cells,]
+FACS.cells <- rownames(FACS.anno)
+FACS.counts <- FACS.counts[FACS.cells,short_markers_list]
 df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
 colnames(df) <- c("Type", colnames(FACS.counts))
-
 
 #load("/allen/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/patchseq/R_Object/20190227_BT014-RSC-195_mouse_patchseq_star2.0_exon.Rdata")
 #load("/allen/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/patchseq/R_Object/20190227_BT014-RSC-195_mouse_patchseq_star2.0_intron.Rdata")
@@ -159,21 +170,25 @@ for (t in Good_types) {
 }
 setwd("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/patchseq-work-dir/Patchseq_vs_FACs_cre_analysis/mouse_patchseq_VISp_20181220_collapsed40_cpm/")
 save(All_fit_values, file="All_fit_values.rda")
-load("All_fit_values.rda")
+#load("All_fit_values.rda")
 
-df <- df[,2:length(colnames(df))]
+#df <- df[,2:length(colnames(df))]
+
 ##########################################################################################
 ### Find Beta for each pair of cell type using an optimizer: #############################
 ##########################################################################################
 df <- t(df)
 
-Err <- function(data, par) {
-  with(data, sum((par[1] * term1 - term2)^2))
+Err <- function(data, par, y) {
+  with(data, 2 * sum((par[1] * term1 + par[2] * term2 - y)^2))
 }
 
 Beta_list <- list()
-for (c in FACS.cells[1:500]){
-  Beta <- list()
+for (c in FACS.cells[2]){
+  B1 <- list()
+  B2 <- list()
+  p1 <- list()
+  p2 <- list()
   start_time = Sys.time()
   for (i in 1:dim(Good_pairs)[1]) {
     first_type <- as.character(Good_pairs[i,1])
@@ -188,24 +203,40 @@ for (c in FACS.cells[1:500]){
     Mu2 <- unlist(list2[genes, "Mu"])
     Pi1 <- unlist(list1[genes, "Pi"])
     Pi2 <- unlist(list2[genes, "Pi"])
-    term1 <- Mu1 - Mu1 * Pi1 - Mu2 + Mu2 * Pi2
-    term2 <- y - Mu2 + Mu2 * Pi2
+    term1 <- Mu1 * (1 - Pi1)
+    term2 <- Mu2 * (1 - Pi2)
     dat <- as.data.frame(cbind(term1, term2))
-    results <- optim(par = runif(1, 0.51, 0.99), 
-                     fn = Err, 
-                     data = dat, 
-                     method = "Brent", 
-                     lower = 0, 
-                     upper = 1000)
-    Beta[pair_name] <-  results$par
+    ui <- cbind(c(1, 0), c(0, 1))
+    ci <- c(0, 0)
+    results <- constrOptim(runif(2, 0.09, 0.99), Err, grad = NULL, ui = ui, ci = ci, y = y, data = dat)
+    B1 <- c(B1, results$par[1])
+    B2 <- c(B2, results$par[2])
+    p1 <- c(p1, first_type)
+    p2 <- c(p2, second_type)
+    
   } 
-  Beta_list[[c]] <- Beta
+  temp <- cbind.data.frame(unlist(B1), unlist(B2), unlist(p1), unlist(p2))
+  colnames(temp) <- c("B1", "B2", "Type1", "Type2")
+  Beta_list[[c]] <- temp
   end_time = Sys.time()
   print(end_time - start_time)
 }
 print("Done!")
-save(Beta_list, file = "Beta_list.rda")
-#load("Beta_list.rda")
+
+real_labels <- FACS.anno["LS-14690_S03_E1-50", c("cluster_label", "cluster_id")]
+temp <- Beta_list$`LS-14690_S03_E1-50`
+temp[order(temp$B1,decreasing = TRUE)[1:10],]
+temp[order(temp$B2,decreasing = TRUE)[1:10],]
+temp[temp$Type2 == real_labels$cluster_id,]
+plot(temp$B1, temp$B2)
+tmp <- as.data.frame(t(df)[t(df)[,"Type"] ==122, ])
+#tmp <- tmp %>% gather()
+#ggplot(tmp, aes(v)) + 
+#  geom_histogram(alpha = 0.5, bins = 40, position = "identity") 
+
+ggplot(gather(tmp), aes(value)) + 
+  geom_histogram(bins = 10) + 
+  facet_wrap(~key, scales = 'free_x')
 
 ##########################################################################################
 ### Find the probability of the observation given Beta: ##################################
@@ -256,18 +287,20 @@ Compute_all_likelihood <- function(gene, yg, list1, list2, cell_name, pair_name)
   con1 <- unlist(con$contamin_count1) 
   con2 <- unlist(con$contamin_count2) 
   #print(con1)
-  #print(con2)
+  con1[con1>100000] <- 100000
+  con2[con2>100000] <- 100000
   term1 <- unlist(Compute_likelihood_efficient(con1, Method = list1[[gene,"Method"]], Pi = list1[[gene,"Pi"]], Mu = list1[[gene,"Mu"]], Alpha = list1[[gene,"Alpha"]]))
   term2 <- unlist(Compute_likelihood_efficient(con2 , Method = list2[[gene,"Method"]], Pi = list2[[gene,"Pi"]], Mu = list2[[gene,"Mu"]], Alpha = list2[[gene,"Alpha"]]))
   sum(term1 * rev(term2))
 }
 
-All_cell_pyg <- list()
-for (c in FACS.cells[1:500]){
+#All_cell_pyg <- list()
+j= 7
+for (c in FACS.cells[j]){
   start_time = Sys.time()
   pyg <- list()
   for (i in 1:dim(Good_pairs)[1]) {
-    #print(i)
+    print(i)
     first_type <- as.character(Good_pairs[i,1])
     second_type <- as.character(Good_pairs[i,2])
     pair_name <- paste0(as.character(first_type), "_", as.character(second_type))
@@ -282,14 +315,14 @@ for (c in FACS.cells[1:500]){
   print(end_time - start_time)
 }
 
-save(All_cell_pyg, file = "All_cell_pyg.rda")
-
+#save(All_cell_pyg, file = "All_cell_pyg.rda")
+#cluster_lable_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
 ##########################################################################################
 ### Find the probability of the observation given Beta: ##################################
 ##########################################################################################
-
-results <- list()
-for (c in FACS.cells[7]){
+j=6
+for (c in FACS.cells[j]){
+  results <- list()
   for (i in 1:dim(Good_pairs)[1]) {
     first_type <- as.character(Good_pairs[i,1])
     second_type <- as.character(Good_pairs[i,2])
@@ -302,7 +335,61 @@ for (c in FACS.cells[7]){
 results[is.infinite(unlist(results))] <- -1000 
 max(unlist(results))
 Good_pairs[which.max(unlist(results)),]
-VIS.cldf[VIS.cldf$cluster_id == Good_pairs[which.max(unlist(results)),][1],c("cluster_label")]
-VIS.cldf[VIS.cldf$cluster_id == Good_pairs[which.max(unlist(results)),][2],c("cluster_label")]
-VIS.cldf[VIS.cldf$cluster_id == VIS.cl[FACS.cells[7]],c("cluster_label")]
-Ty
+cluster_lable_id[cluster_lable_id$cluster_id == Good_pairs[which.max(unlist(results)),][1],]
+cluster_lable_id[cluster_lable_id$cluster_id == Good_pairs[which.max(unlist(results)),][2],]
+FACS.anno[FACS.cells[j], "cluster_label"]
+Beta_list[[FACS.cells[j]]]$`97_105`
+Beta_list[[FACS.cells[j]]]$`67_105`
+
+###########################################TEST##################################################
+
+
+
+##########################################################################################
+### Find Beta for each pair of cell type using an optimizer: #############################
+##########################################################################################
+df <- t(df)
+
+Err <- function(data, par) {
+  with(data, sum((par[1] * term1 - term2)^2))
+}
+
+Beta_list <- list()
+for (c in FACS.cells[1:50]){
+  Beta <- list()
+  start_time = Sys.time()
+  for (i in 1:dim(Good_pairs)[1]) {
+    first_type <- as.character(Good_pairs[i,1])
+    second_type <- as.character(Good_pairs[i,2])
+    pair_name <- paste0(as.character(first_type), "_", as.character(second_type))
+    list1 <- as.data.frame(t(All_fit_values[[first_type]]))
+    list2 <- as.data.frame(t(All_fit_values[[second_type]]))
+    #y = patchseq_counts[genes, c] 
+    y = df[genes, c]
+    if(length(y) == 0) {print("ERROR: Something is wrong!!!!!!!")}
+    Mu1 <- unlist(list1[genes, "Mu"])
+    Mu2 <- unlist(list2[genes, "Mu"])
+    Pi1 <- unlist(list1[genes, "Pi"])
+    Pi2 <- unlist(list2[genes, "Pi"])
+    term1 <- Mu1 - Mu1 * Pi1 - Mu2 + Mu2 * Pi2
+    term2 <- y - Mu2 + Mu2 * Pi2
+    dat <- as.data.frame(cbind(term1, term2))
+    results <- optim(par = runif(1, 0.09, 0.99), 
+                     fn = Err, 
+                     data = dat, 
+                     method = "Brent", 
+                     lower = 0, 
+                     upper = 1000)
+    Beta[pair_name] <-  results$par
+  } 
+  Beta_list[[c]] <- Beta
+  end_time = Sys.time()
+  print(end_time - start_time)
+}
+print("Done!")
+save(Beta_list, file = "Beta_list.rda")
+#load("Beta_list.rda")
+
+ggplot(tmp, aes(Var, fill = Method)) + 
+  geom_histogram(alpha = 0.5, bins = 40, position = "identity") + xlim(c(0,100)) +
+  xlab(xlabel) + ylab("Density")
