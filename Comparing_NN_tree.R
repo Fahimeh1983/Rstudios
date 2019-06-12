@@ -1,37 +1,48 @@
-#
-Where = "/allen"
-mydir = paste0(Where , "/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/patchseq-work-dir/Patchseq_vs_FACs_cre_analysis/mouse_patchseq_VISp_20181220_collapsed40_cpm/")
-setwd(mydir)
+##########################################################################################
+### Setting up the libraries: ############################################################
+##########################################################################################
+
 library(dendextend)
-source(paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20181220_collapsed40_cpm/patchseq/heatmap.R"))
-source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20181220_collapsed40_cpm/patchseq/de.genes.R"))
-source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20181220_collapsed40_cpm/patchseq/dendro.R"))
-source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20181220_collapsed40_cpm/patchseq/patchseq.R"))
-source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Plot_tree_functions.R"))
 library(matrixStats)
 library(feather)
 library(dplyr)
-#devtools::install_github("AllenInstitute/scrattch.io")
 library(scrattch.io)
 library(scrattch.vis)
 library(feather)
 library(dendextend)
 library(tibble)
 library(Matrix)
+Where = "/allen"
+mydir = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/patchseq-work-dir/Patchseq_vs_FACs_cre_analysis/mouse_patchseq_VISp_20181220_collapsed40_cpm/")
+source(paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20181220_collapsed40_cpm/patchseq/heatmap.R"))
+source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20181220_collapsed40_cpm/patchseq/de.genes.R"))
+source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20181220_collapsed40_cpm/patchseq/dendro.R"))
+source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20181220_collapsed40_cpm/patchseq/patchseq.R"))
+source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Plot_tree_functions.R"))
+source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R"))
+setwd(mydir)
+#devtools::install_github("AllenInstitute/scrattch.io")
 options(stringsAsFactors = F)
 
-batch_date="20190227_BT014-RSC-195"
 
+##########################################################################################
+### Setting up the path dirs: ############################################################
+##########################################################################################
+
+batch_date="20190227_BT014-RSC-195"
 patchseq.dir = paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_current/")
 facs.dir = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/facs_seq/mouse_V1_ALM_20180520/")
 robject.dir = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/patchseq/R_Object/")
 FACs.robject.dir = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/facs/R_Object/")
 ref.data.rda.path = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20180626_collapsed40_cpm/")
+select.markers.path = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2.3.1/select.markers.rda")
+latest.mapping.memb.path = paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20190529_collapsed40_cpm/mapping.memb.with.bp.40.rda")
+latest.mapping.df.path = paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20190529_collapsed40_cpm/mapping.df.with.bp.40.rda")
 
-source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R"))
+##########################################################################################
+### Reading REF FACS data, dend and markers list: ########################################
+##########################################################################################
 
-
-#Read FACs ref data
 FACs_anno <- Read_anno_cellonly_region(paste0(facs.dir, "anno.feather"), region = "VISp")
 load(paste0(ref.data.rda.path, "ref.data.rda"))
 load(paste0(ref.data.rda.path, "V1.dend.with.bp.40.rda"))
@@ -39,14 +50,15 @@ load(paste0(ref.data.rda.path, "V1.dend.list.with.bp.40.rda"))
 plot(dend)
 cl <- Renew_list(ls = cl, ref.df = cl.df, label = "cluster_id", new.label = "cluster_label")
 select.cl <- labels(dend)
-load("select.markers.rda")
+load(select.markers.path)
 
-
-#Read Patchseq data
+##########################################################################################
+### Reading REF FACS data, dend and markers list: ########################################
+##########################################################################################
 batch_date="20190227_BT014-RSC-195"
 robject.dir = paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/patchseq/R_Object/")
 query.dat.norm = Get_patchseq_norm(cpm_rdata_path = paste0(robject.dir,batch_date,"_mouse_patchseq_star2.0_cpm.Rdata"),
-                  samp_rdata_path = paste0(robject.dir,batch_date,"_mouse_patchseq_star2.0_samp.dat.Rdata"))
+                                   samp_rdata_path = paste0(robject.dir,batch_date,"_mouse_patchseq_star2.0_samp.dat.Rdata"))
 patchseq_anno <- Read_patchseq_anno(paste0(patchseq.dir,"anno.feather"))
 dim(patchseq_anno)
 
@@ -54,133 +66,137 @@ dim(patchseq_anno)
 locked_cells_spec_id = rownames(read.csv("2018_mouse_met_dataset.csv", check.names=FALSE, row.names = 1 ))
 locked_cells_sample_id = patchseq_anno[patchseq_anno$spec_id_label %in% locked_cells_spec_id, "sample_id"]
 
-######################################################################################################
-######################################## Mapping data using Tree #####################################
-######################################################################################################
+##########################################################################################
+######################################## Mapping data using Tree #########################
+##########################################################################################
 
 set.seed(1983)
-Patchseq_Tree_memb = map_dend_membership(dend, cl, norm.dat, query.dat.norm, colnames(query.dat.norm), bs.num=100, p=0.7, low.th=0.15)
-Patchseq_Tree_mapping.df <- summarize_cl(dend, Patchseq_Tree_memb, query.dat.norm, conf.th=0.7, min.genes=1, min.genes.ratio=0.3)
+#Patchseq_Tree_memb = map_dend_membership(dend, cl, norm.dat, query.dat.norm, colnames(query.dat.norm), bs.num=100, p=0.7, low.th=0.15)
+#Patchseq_Tree_mapping.df <- summarize_cl(dend, Patchseq_Tree_memb, query.dat.norm, conf.th=0.7, min.genes=1, min.genes.ratio=0.3)
 #save(Patchseq_Tree_mapping.df, file=file.path(paste0("Final_matrices/Patchseq_Tree_mapping.df", ".rda")))
 #save(Patchseq_Tree_memb, file=file.path(paste0("Final_matrices/Patchseq_Tree_mapping.memb",".rda")))
-Patchseq_Tree_memb <- Patchseq_Tree_memb[locked_cells_sample_id,]
-Patchseq_Tree_mapping.df <- Patchseq_Tree_mapping.df[locked_cells_sample_id,]
+#Patchseq_Tree_memb <- Patchseq_Tree_memb[locked_cells_sample_id,]
+#Patchseq_Tree_mapping.df <- Patchseq_Tree_mapping.df[locked_cells_sample_id,]
 #save(Patchseq_Tree_mapping.df, file=file.path(paste0("Final_matrices_locked_data/Patchseq_Tree_mapping.df", ".rda")))
 #save(Patchseq_Tree_memb, file=file.path(paste0("Final_matrices_locked_data/Patchseq_Tree_mapping.memb",".rda")))
-load("Final_matrices_locked_data/AIM1.1/mapping.memb.rda")
-load("Final_matrices_locked_data/AIM1.1/mapping.df.rda")
+#load("Final_matrices_locked_data/AIM1.1/mapping.memb.rda")
+#load("Final_matrices_locked_data/AIM1.1/mapping.df.rda")
+load(latest.mapping.memb.path)
+Patchseq_Tree_memb <- memb
+load(latest.mapping.df.path)
+Patchseq_Tree_mapping.df <- mapping.df
+rm(memb)
+rm(mapping.df)
 
 #Mapping FACS data
 FACs.cells <- colnames(norm.dat)
 set.seed(1983)
-FACS_Tree_memb <- map_dend_membership(dend, cl, norm.dat, norm.dat, FACs.cells, bs.num=100, p=0.7, low.th=0.15)
-FACS_Tree_mapping.df <- summarize_cl(dend, FACS_Tree_memb, norm.dat, conf.th=0.7, min.genes=1, min.genes.ratio=0.3)
+#FACS_Tree_memb <- map_dend_membership(dend, cl, norm.dat, norm.dat, FACs.cells, bs.num=100, p=0.7, low.th=0.15)
+#FACS_Tree_mapping.df <- summarize_cl(dend, FACS_Tree_memb, norm.dat, conf.th=0.7, min.genes=1, min.genes.ratio=0.3)
 #save(FACS_Tree_mapping.df, file=file.path(paste0("Final_matrices_locked_data/FACS_Tree_mapping.df", ".rda")))
 #save(FACS_Tree_memb, file=file.path(paste0("Final_matrices_locked_data/FACS_Tree_mapping.memb",".rda")))
-load("Final_matrices_locked_data/AIT2.3.1/mapping.df.rda")
-load("Final_matrices_locked_data/AIT2.3.1/mapping.memb.rda")
+#load("Final_matrices_locked_data/AIT2.3.1/mapping.df.rda")
+#load("Final_matrices_locked_data/AIT2.3.1/mapping.memb.rda")
 
 
-######################################################################################################
-######################################## Read mapped NN results  #####################################
-######################################################################################################
+##########################################################################################
+### Read mapped NN results  ##############################################################
+##########################################################################################
 
-source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R"))
-
-Patchseq_NN_memb = read.csv(paste0("Final_matrices_locked_data/AIM1.2/mapping_memb.csv"), check.names=FALSE, row.names = 1)
-FACs_NN_memb <- as.matrix(read.csv("Final_matrices_locked_data/AIT2.3.2/mapping_memb.csv" , check.names=FALSE, row.names = 1))
+Patchseq_NN_memb <- read.csv("NN_b_500000_500_patchseq_membership.csv", check.names=FALSE, row.names = 1)
+FACs_NN_memb <- read.csv("NN_b_500000_500_FACs_membership.csv" , check.names=FALSE, row.names = 1)
 #Patchseq_NN_memb <- Patchseq_NN_memb[locked_cells_sample_id,]
 #save(Patchseq_NN_memb, file=file.path(paste0("Final_matrices_locked_data/Patchseq_NN_10_10000ephocs_500batch_mapping.memb",".rda")))
 
 #NN_FACs_memb = NN_FACs_memb / rowSums(FACs_NN_memb)
-#NN_memb = NN_memb / rowSums(NN_memb)
+#NN_memb = NN_memb / rowSums(Patchseq_NN_memb)
 colnames(Patchseq_NN_memb) <- select.cl
 colnames(FACs_NN_memb) <- select.cl
-######################################################################################################
-#################################### Read mapped Seurat results  #####################################
-######################################################################################################
 
-source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R"))
+##########################################################################################
+### Read mapped Seurat results  ##########################################################
+##########################################################################################
 
-Seurat_memb = read.csv(paste0("Seurat_memb.csv"), check.names=FALSE, row.names = 1)
-colnames(Seurat_memb) <- gsub("\\."," " ,gsub("prediction.score.","",colnames(Seurat_memb)))
-colnames(Seurat_memb) <- gsub("L2 3", "L2/3", colnames(Seurat_memb))
-Seurat_memb <- Seurat_memb[,select.cl]
+#source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R"))
+
+#Seurat_memb = read.csv(paste0("Seurat_memb.csv"), check.names=FALSE, row.names = 1)
+#colnames(Seurat_memb) <- gsub("\\."," " ,gsub("prediction.score.","",colnames(Seurat_memb)))
+#colnames(Seurat_memb) <- gsub("L2 3", "L2/3", colnames(Seurat_memb))
+#Seurat_memb <- Seurat_memb[,select.cl]
 
 
-######################################################################################################
-############################## Building mapping probability matrix ###################################
-######################################################################################################
+##########################################################################################
+### Building mapping probability matrix ##################################################
+##########################################################################################
 
-FACs.cells <- colnames(norm.dat)
 set.seed(1983)
-Tree_mapping_probability = compute_mapping_probability(memb = FACS_Tree_memb, select.cells = FACs.cells, 
-                                                       select.cl = select.cl, ref.cl= cl)
+#Tree_mapping_probability = compute_mapping_probability(memb = FACS_Tree_memb, select.cells = FACs.cells, 
+#                                                       select.cl = select.cl, ref.cl= cl)
 
 #save(Tree_mapping_probability, file=file.path(paste0("Final_matrices_locked_data/REF_Tree_mapping_probability.rda")))
-load("Final_matrices_locked_data/AIT2.3.1/REF_mapping_probability.rda")
+load("//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2.3.1/REF_mapping_probability.rda")
 
 NN_mapping_probability = compute_mapping_probability(memb = FACs_NN_memb, select.cells = FACs.cells, 
                                                      select.cl = select.cl, ref.cl = cl)
 #save(NN_mapping_probability, file=file.path(paste0("Final_matrices_locked_data/REF_NN_mapping_probability.rda")))
-load("Final_matrices_locked_data/AIT2.3.2/REF_mapping_probability.rda")
+#load("Final_matrices_locked_data/AIT2.3.2/REF_mapping_probability.rda")
 
 
-######################################################################################################
-############################################# KLdiv ##################################################
-######################################################################################################
+###########################################################################################
+### KLdiv #################################################################################
+###########################################################################################
 set.seed(1983)
-Tree_FACs_KLdiv = compute_KLdiv(select.cl = select.cl, 
-                           select.cells = FACs.cells, 
-                           mapping_probability = Tree_mapping_probability, 
-                           memb = FACS_Tree_memb)
+#Tree_FACs_KLdiv = compute_KLdiv(select.cl = select.cl, 
+#                           select.cells = FACs.cells, 
+#                           mapping_probability = Tree_mapping_probability, 
+#                           memb = FACS_Tree_memb)
 #save(Tree_FACs_KLdiv, file=file.path(paste0("Final_matrices_locked_data/Tree_FACs_KLdiv", ".rda")))
-load("Final_matrices_locked_data/AIT2.3.1/KLdiv.rda")
+#load("Final_matrices_locked_data/AIT2.3.1/KLdiv.rda")
 
 Patchseq_Tree_KLdiv = compute_KLdiv(select.cl = select.cl, 
-                           select.cells = locked_cells_sample_id, 
-                           #select.cells = colnames(query.dat.norm),
-                           mapping_probability = Tree_mapping_probability, 
-                           memb = Patchseq_Tree_memb)
+                                    select.cells = locked_cells_sample_id, 
+                                    #select.cells = colnames(query.dat.norm),
+                                    mapping_probability = Tree_mapping_probability, 
+                                    memb = Patchseq_Tree_memb)
 
 #save(Patchseq_Tree_KLdiv, file=file.path(paste0("Final_matrices/Tree_Patchseq_KLdiv", ".rda")))
 #save(Patchseq_Tree_KLdiv, file=file.path(paste0("Final_matrices_locked_data/Tree_Patchseq_KLdiv", ".rda")))
-load("Final_matrices_locked_data/AIM1.1/KLdiv.rda")
+#load("Final_matrices_locked_data/AIM1.1/KLdiv.rda")
 
 NN_FACs_KLdiv = compute_KLdiv(select.cl = select.cl, 
-                         select.cells = FACs.cells, 
-                         mapping_probability = NN_mapping_probability, 
-                         memb = as.matrix(FACs_NN_memb))
-save(NN_FACs_KLdiv, file=file.path(paste0("Final_matrices_locked_data/NN_FACs_KLdiv", ".rda")))
-load("Final_matrices_locked_data/AIT2.3.2/KLdiv.rda")
+                              select.cells = FACs.cells, 
+                              mapping_probability = NN_mapping_probability, 
+                              memb = as.matrix(FACs_NN_memb))
+#save(NN_FACs_KLdiv, file=file.path(paste0("Final_matrices_locked_data/NN_FACs_KLdiv", ".rda")))
+#load("Final_matrices_locked_data/AIT2.3.2/KLdiv.rda")
 
 Patchseq_NN_KLdiv = compute_KLdiv(select.cl = select.cl, 
-                        select.cells = locked_cells_sample_id, 
-                        #select.cells = colnames(query.dat.norm), 
-                        mapping_probability = NN_mapping_probability, 
-                         memb = as.matrix(Patchseq_NN_memb))
+                                  select.cells = locked_cells_sample_id, 
+                                  #select.cells = colnames(query.dat.norm), 
+                                  mapping_probability = NN_mapping_probability, 
+                                  memb = as.matrix(Patchseq_NN_memb))
 
 #save(Patchseq_NN_KLdiv, file=file.path(paste0("Final_matrices/NN_Patchseq_KLdiv", ".rda")))
-load("Final_matrices_locked_data/AIM1.2/KLdiv.rda")
+#load("Final_matrices_locked_data/AIM1.2/KLdiv.rda")
 
-######################################################################################################
-######################################### Correlation ################################################
-######################################################################################################
+##########################################################################################
+### Correlation ##########################################################################
+##########################################################################################
 
 FACs_anno <- FACs_anno[FACs.cells, ] #Ask zizhen why some cells are not in norm.dat
 FACs.cl.med <- Compute_median_gene_expression(anno_file = FACs_anno, norm.dat = norm.dat , markers = select.markers)
-save(FACs.cl.med, file=file.path(paste0("Final_matrices/FACs.cl.med", ".rda")))
-load("Final_matrices/FACs.cl.med.rda")
+#save(FACs.cl.med, file=file.path(paste0("Final_matrices/FACs.cl.med", ".rda")))
+#load("Final_matrices/FACs.cl.med.rda")
 
 Patchseq_FACs_cor <- Compute_correlation_mat(markers = select.markers, cells = colnames(query.dat.norm), #locked_cells_sample_id, 
                                              query.dat.norm = query.dat.norm, train.cl.med = FACs.cl.med)
 
 FACs_FACs_cor <- Compute_correlation_mat(markers = select.markers, cells = FACs.cells, 
-                                             query.dat.norm = norm.dat, train.cl.med = FACs.cl.med)
+                                         query.dat.norm = norm.dat, train.cl.med = FACs.cl.med)
 
-######################################################################################################
-######################################## Aggreagte results ###########################################
-######################################################################################################
+###########################################################################################
+### Aggreagte results #####################################################################
+###########################################################################################
 
 source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R"))
 
@@ -223,56 +239,64 @@ colnames(NN_3_cor) <- c("NN_first_cor", "NN_second_cor", "NN_third_cor")
 #cells <- colnames(query.dat.norm)
 cells <- locked_cells_sample_id
 results <- cbind.data.frame(Tree_3_cls[cells,],
-                 NN_3_cls[cells,],
-                 Tree_3_bts[cells,],
-                 NN_3_bts[cells,],
-                 Tree_3_KL[cells,],
-                 NN_3_KL[cells,],
-                 Tree_3_cor[cells,],
-                 NN_3_cor[cells,])#,
-                 #Seurat_3_cls[locked_cells_sample_id,],
-                 #Seurat_3_bts[locked_cells_sample_id,])
+                            NN_3_cls[cells,],
+                            Tree_3_bts[cells,],
+                            NN_3_bts[cells,],
+                            Tree_3_KL[cells,],
+                            NN_3_KL[cells,],
+                            Tree_3_cor[cells,],
+                            NN_3_cor[cells,])#,
+#Seurat_3_cls[locked_cells_sample_id,],
+#Seurat_3_bts[locked_cells_sample_id,])
 
 
 ##### FACs data
 
-Tree_3_cls <- Get_3_best_cl(FACS_Tree_memb, select.cl)
-colnames(Tree_3_cls) <- c("Tree_first_cl", "Tree_second_cl", "Tree_third_cl")
+#Tree_3_cls <- Get_3_best_cl(FACS_Tree_memb, select.cl)
+#colnames(Tree_3_cls) <- c("Tree_first_cl", "Tree_second_cl", "Tree_third_cl")
 
-Tree_3_bts <- Get_3_best_bt(FACS_Tree_memb, select.cl)
-colnames(Tree_3_bts) <- c("Tree_first_bt", "Tree_second_bt", "Tree_third_bt")
+#Tree_3_bts <- Get_3_best_bt(FACS_Tree_memb, select.cl)
+#colnames(Tree_3_bts) <- c("Tree_first_bt", "Tree_second_bt", "Tree_third_bt")
 
-NN_3_cls <- Get_3_best_cl(FACs_NN_memb, select.cl)
-colnames(NN_3_cls) <- c("NN_first_cl", "NN_second_cl", "NN_third_cl")
+#NN_3_cls <- Get_3_best_cl(FACs_NN_memb, select.cl)
+#colnames(NN_3_cls) <- c("NN_first_cl", "NN_second_cl", "NN_third_cl")
 
-NN_3_bts <- Get_3_best_bt(FACs_NN_memb, select.cl)
-colnames(NN_3_bts) <- c("NN_first_bt", "NN_second_bt", "NN_third_bt")
+#NN_3_bts <- Get_3_best_bt(FACs_NN_memb, select.cl)
+#colnames(NN_3_bts) <- c("NN_first_bt", "NN_second_bt", "NN_third_bt")
 
-Tree_3_KL <- Get_3_best_KL(memb = FACS_Tree_memb, ref.cl = select.cl, KLdiv = Tree_FACs_KLdiv)
-colnames(Tree_3_KL) <-c("Tree_first_KL", "Tree_second_KL", "Tree_third_KL")
+#Tree_3_KL <- Get_3_best_KL(memb = FACS_Tree_memb, ref.cl = select.cl, KLdiv = Tree_FACs_KLdiv)
+#colnames(Tree_3_KL) <-c("Tree_first_KL", "Tree_second_KL", "Tree_third_KL")
 
-NN_3_KL <- Get_3_best_KL(memb = FACs_NN_memb, ref.cl = select.cl, KLdiv = NN_FACs_KLdiv)
-colnames(NN_3_KL) <- c("NN_first_KL", "NN_second_KL", "NN_third_KL")
+#NN_3_KL <- Get_3_best_KL(memb = FACs_NN_memb, ref.cl = select.cl, KLdiv = NN_FACs_KLdiv)
+#colnames(NN_3_KL) <- c("NN_first_KL", "NN_second_KL", "NN_third_KL")
 
-Tree_3_cor <- Get_3_best_cor(memb = FACS_Tree_memb, ref.cl = select.cl, cor = FACs_FACs_cor)
-colnames(Tree_3_cor) <- c("Tree_first_cor", "Tree_second_cor", "Tree_third_cor")
+#Tree_3_cor <- Get_3_best_cor(memb = FACS_Tree_memb, ref.cl = select.cl, cor = FACs_FACs_cor)
+#colnames(Tree_3_cor) <- c("Tree_first_cor", "Tree_second_cor", "Tree_third_cor")
 
-NN_3_cor <- Get_3_best_cor(memb = FACs_NN_memb, ref.cl = select.cl, cor = FACs_FACs_cor)
-colnames(NN_3_cor) <- c("NN_first_cor", "NN_second_cor", "NN_third_cor")
+#NN_3_cor <- Get_3_best_cor(memb = FACs_NN_memb, ref.cl = select.cl, cor = FACs_FACs_cor)
+#colnames(NN_3_cor) <- c("NN_first_cor", "NN_second_cor", "NN_third_cor")
 
-results <- cbind.data.frame(Tree_3_cls[FACs.cells,],
-                            NN_3_cls[FACs.cells,],
-                            Tree_3_bts[FACs.cells,],
-                            NN_3_bts[FACs.cells,],
-                            Tree_3_KL[FACs.cells,],
-                            NN_3_KL[FACs.cells,],
-                            Tree_3_cor[FACs.cells,],
-                            NN_3_cor[FACs.cells,])
+#results <- cbind.data.frame(Tree_3_cls[FACs.cells,],
+#                            NN_3_cls[FACs.cells,],
+#                            Tree_3_bts[FACs.cells,],
+#                            NN_3_bts[FACs.cells,],
+#                            Tree_3_KL[FACs.cells,],
+#                            NN_3_KL[FACs.cells,],
+#                            Tree_3_cor[FACs.cells,],
+#                            NN_3_cor[FACs.cells,])
 
-######################################################################################################
-############################################### Good, Bad ############################################
-######################################################################################################
-
+##########################################################################################
+### Assign cell identities: ##############################################################
+##########################################################################################
+cells <- locked_cells_sample_id
+results <- cbind.data.frame(Tree_3_cls[cells,],
+                            NN_3_cls[cells,],
+                            Tree_3_bts[cells,],
+                            NN_3_bts[cells,],
+                            Tree_3_KL[cells,],
+                            NN_3_KL[cells,],
+                            Tree_3_cor[cells,],
+                            NN_3_cor[cells,])#,
 Original_cols <- colnames(results)
 
 results <- results %>% 
@@ -324,37 +348,53 @@ results <- results %>%
   column_to_rownames("id") 
 
 results <- results[,c(Original_cols, "Tree_call", "NN_call", "Tree_color", "NN_color", "Tree_id", "NN_id")]
+sum(results$Tree_first_cl == results$NN_first_cl & results$Tree_call=="Core"  & results$NN_call=="Core" )
+sum(results$Tree_first_cl == results$NN_first_cl & (results$Tree_call=="Core" | results$Tree_call=="I1") & (results$NN_call=="Core" | results$NN_call=="I1"))
+sum(results$Tree_first_cl == results$NN_first_cl & (results$Tree_call=="Core" | results$Tree_call=="I1" | results$Tree_call=="I2") & 
+      (results$NN_call=="Core" | results$NN_call=="I1" | results$NN_call=="I2"))
+sum(results$Tree_first_cl == results$NN_first_cl & (results$Tree_call=="Core" | results$Tree_call=="I1" | results$Tree_call=="I2" | results$Tree_call=="I3") & 
+      (results$NN_call=="Core" | results$NN_call=="I1" | results$NN_call=="I2" | results$NN_call=="I3"))
 
+sum(results$Tree_call!="PoorQ"  & results$NN_call!="PoorQ" )
+
+#sum(results$Tree_first_cl == results$NN_first_cl & results$Tree_call=="I2" & results$Tree_call=="I2")
+#sum(results$Tree_first_cl == results$NN_first_cl & results$Tree_call=="I3" & results$Tree_call=="I3")
+#sum(results$Tree_call!="PoorQ" & results$NN_call!="PoorQ")
+
+sum(results$Tree_call!="PoorQ" & results$NN_call!="PoorQ")
 #write.csv(results,"Final_matrices_locked_data/FACs_results.csv")
-write.csv(results,"Final_matrices_locked_data/Patchseq_results.csv")
+#write.csv(results,"Final_matrices_locked_data/Patchseq_results.csv")
 
-Tree_cls <- c("Tree_first_cl", "Tree_second_cl", "Tree_third_cl",
-              "Tree_first_bt", "Tree_second_bt", "Tree_third_bt",
-              "Tree_first_KL", "Tree_second_KL", "Tree_third_KL", 
-              "Tree_first_cor", "Tree_second_cor", "Tree_third_cor",
-              "Tree_call", "Tree_color", "Tree_id")
-NN_cls <- colnames(results)[!colnames(results) %in% Tree_cls]
-write.csv(results[,Tree_cls], "Final_matrices_locked_data/Tree_Patchseq_results.csv")
-write.csv(results[,NN_cls], "Final_matrices_locked_data/NN_Patchseq_results.csv")
+#Tree_cls <- c("Tree_first_cl", "Tree_second_cl", "Tree_third_cl",
+#              "Tree_first_bt", "Tree_second_bt", "Tree_third_bt",
+#              "Tree_first_KL", "Tree_second_KL", "Tree_third_KL", 
+#              "Tree_first_cor", "Tree_second_cor", "Tree_third_cor",
+#              "Tree_call", "Tree_color", "Tree_id")
+#NN_cls <- colnames(results)[!colnames(results) %in% Tree_cls]
+#write.csv(results[,Tree_cls], "Final_matrices_locked_data/Tree_Patchseq_results.csv")
+#write.csv(results[,NN_cls], "Final_matrices_locked_data/NN_Patchseq_results.csv")
 #write.csv(results[,Tree_cls], "Final_matrices_locked_data/Tree_FACS_results.csv")
 #write.csv(results[,NN_cls], "Final_matrices_locked_data/NN_FACS_results.csv")
 
-#results[locked_cells_sample_id,"Old_cluster"] <- Patchseq_Tree_mapping.df[locked_cells_sample_id, "cl"]
-#Leaf_node_cells <- rownames(Tree_mapping.df)[Tree_mapping.df$resolution.index==1]
-#Internal_node_cells <- rownames(Tree_mapping.df)[(Tree_mapping.df$resolution.index < 1 & Tree_mapping.df$resolution.index > 0.7)]
-#PoorQ_cells <- setdiff(rownames(Tree_mapping.df), c(Leaf_node_cells, Internal_node_cells))
+results[locked_cells_sample_id,"Old_cluster"] <- Patchseq_Tree_mapping.df[locked_cells_sample_id, "cl"]
+Leaf_node_cells <- rownames(Patchseq_Tree_mapping.df)[Patchseq_Tree_mapping.df$resolution.index==1]
+Internal_node_cells <- rownames(Patchseq_Tree_mapping.df)[(Patchseq_Tree_mapping.df$resolution.index < 1 &Patchseq_Tree_mapping.df$resolution.index > 0.7)]
+PoorQ_cells <- setdiff(rownames(Patchseq_Tree_mapping.df), c(Leaf_node_cells, Internal_node_cells))
+Leaf_node_cells <- intersect(Leaf_node_cells, locked_cells_sample_id)
+Internal_node_cells <- intersect(Internal_node_cells, locked_cells_sample_id)
+PoorQ_cells <- intersect(PoorQ_cells, locked_cells_sample_id)
 
-#results[Leaf_node_cells, "Old_call"] <- c("Leaf_node")
-#results[Internal_node_cells, "Old_call"] <- c("Internal_node")
-#results[PoorQ_cells, "Old_call"] <- c("PoorQ")
+results[Leaf_node_cells, "Old_call"] <- c("Leaf_node")
+results[Internal_node_cells, "Old_call"] <- c("Internal_node")
+results[PoorQ_cells, "Old_call"] <- c("PoorQ")
 
-#results[Leaf_node_cells, "Old_color"] <- c("Green")
-#results[Internal_node_cells, "Old_color"] <- c("Blue")
-#results[PoorQ_cells, "Old_color"] <- c("Purple")
+results[Leaf_node_cells, "Old_color"] <- c("Green")
+results[Internal_node_cells, "Old_color"] <- c("Blue")
+results[PoorQ_cells, "Old_color"] <- c("Purple")
 
-#results[Leaf_node_cells, "Old_id"] <- c(1)
-#results[Internal_node_cells, "Old_id"] <- c(2)
-#results[PoorQ_cells, "Old_id"] <- c(3)
+results[Leaf_node_cells, "Old_id"] <- c(1)
+results[Internal_node_cells, "Old_id"] <- c(2)
+results[PoorQ_cells, "Old_id"] <- c(3)
 
 ggplot(results, aes(Tree_first_bt , fill = Tree_call)) + 
   geom_density(alpha = 0.3) + xlim(c(0,1)) + 
@@ -372,26 +412,89 @@ ggplot(results, aes(NN_second_bt  , fill = NN_call)) +
   geom_density(alpha = 0.3) + xlim(c(0,1)) +
   xlab("second cluster call confidence") + ylab("Density")
 
-######################################################################################################
-############################################ Core, I1, I2 size #######################################
-######################################################################################################
+##########################################################################################
+### Core, I1, I2 size ####################################################################
+##########################################################################################
 
 source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R"))
 
 core_I1_size <- Get_size_of_core_I1_cells(results)
 I2_confusions <- Get_size_of_I2_confusions(results)
 
-Tree_t_type_layer_info <- cbind(Patchseq_results[locked_cells_sample_id, 
-                                                 c("Tree_first_cl", "Tree_second_cl", "Tree_third_cl", 
-                                                   "Tree_first_bt", "Tree_second_bt", "Tree_third_bt", 
-                                                   "Tree_call")],patchseq_anno[locked_cells_sample_id, "layer_label"])
-write.csv(Tree_t_type_layer_info, "Shared_with_IVSCC/Tree_t_type_layer_info.csv")
 write.csv(core_I1_size, "/Shared_with_IVSCC/Core_I1_size.csv")
 write.csv(I2_confusions,"/Shared_with_IVSCC/I2_type_confusion.csv")
 
-######################################################################################################
-############################################### PLOTS ################################################
-######################################################################################################
+##########################################################################################
+### River plot ###########################################################################
+##########################################################################################
+
+source(paste0( Where, "/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Plot_utils.R"))
+library(dplyr)
+
+tmp <- results %>% 
+  rownames_to_column("id") %>% 
+  dplyr::select(id ,Tree_id, Tree_call, Tree_color, NN_id, NN_call, NN_color) %>%
+  `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
+                  "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
+
+river_plot(tmp, min.cells=0, min.frac=0)
+
+tmp <- results %>% 
+  rownames_to_column("id") %>% 
+  dplyr::select(id ,Tree_id, Tree_call, Tree_color, Old_id, Old_call, Old_color) %>%
+  `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
+                  "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
+
+river_plot(tmp, min.cells=0, min.frac=0)
+
+tmp <- results %>% 
+  rownames_to_column("id") %>% 
+  dplyr::select(id ,Tree_id, Tree_call, Tree_color, NN_id, NN_call, NN_color) %>%
+  `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
+                  "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
+
+Tree_cl_label <- set_names(results$Tree_first_cl, rownames(results))
+Tree_cl_color <- as.character(Renew_list(ls = Tree_cl_label, ref.df = cl.df,label = "cluster_label",new.label = "cluster_color"))
+Tree_cl_id <- as.character(Renew_list(ls = Tree_cl_label, ref.df = cl.df,label = "cluster_label",new.label = "cluster_id"))
+NN_cl_label <- set_names(results$NN_first_cl, rownames(results))
+NN_cl_color <- as.character(Renew_list(ls = NN_cl_label, ref.df = cl.df,label = "cluster_label",new.label = "cluster_color"))
+NN_cl_id <- as.character(Renew_list(ls = NN_cl_label, ref.df = cl.df,label = "cluster_label",new.label = "cluster_id"))
+results <- cbind.data.frame(results, Tree_cl_color, Tree_cl_id, NN_cl_color, NN_cl_id)
+results$Tree_cl_color <- as.character(results$Tree_cl_color)
+results$NN_cl_color <- as.character(results$NN_cl_color)
+results$Tree_cl_id <- as.integer(results$Tree_cl_id)
+results$NN_cl_id <- as.integer(results$NN_cl_id)
+rm(NN_cl_id,NN_cl_color, NN_cl_label, Tree_cl_color, Tree_cl_id, Tree_cl_label)
+
+INH_cl <- cl.df[cl.df$class_label == "GABAergic", "cluster_label"]
+EXC_cl <-  cl.df[cl.df$class_label == "Glutamatergic", "cluster_label"]
+
+
+source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Plot_utils.R"))
+
+tmp <- results[results$Tree_call != "PoorQ" & results$NN_call!="PoorQ" & results$Tree_first_cl %in% INH_cl,] %>% 
+  rownames_to_column("id") %>% 
+  dplyr::select(id ,Tree_cl_id, Tree_first_cl, Tree_cl_color, NN_cl_id, NN_first_cl, NN_cl_color) %>%
+  `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
+                  "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
+river_plot(tmp, min.cells=0, min.frac=0)
+
+go_63x_cells = patchseq_anno[patchseq_anno$go_no_go_63x_label == "63x go", "sample_id"]
+go_63x_cells = go_63x_cells[go_63x_cells %in% locked_cells_sample_id]
+
+sub <- results[go_63x_cells,]
+
+tmp <- sub[sub$Tree_call != "PoorQ" & sub$NN_call!="PoorQ" & sub$Tree_first_cl %in% INH_cl,] %>% 
+  rownames_to_column("id") %>% 
+  dplyr::select(id ,Tree_cl_id, Tree_first_cl, Tree_cl_color, NN_cl_id, NN_first_cl, NN_cl_color) %>%
+  `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
+                  "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
+river_plot(tmp, min.cells=0, min.frac=0)
+
+
+##########################################################################################
+############################################### PLOTS ####################################
+##########################################################################################
 
 ggplot(data = melt(NN_mapping_probability[select.cl, select.cl]), aes(x=Var1, y=Var2, fill=value)) +
   geom_tile()+ theme(axis.text = element_text(size=5)) + 
@@ -400,7 +503,6 @@ ggplot(data = melt(NN_mapping_probability[select.cl, select.cl]), aes(x=Var1, y=
   scale_fill_gradient(low = "white", high = "red")
 
 
-source(paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Plot_utils.R"))
 NN = Get_nth_predicted_bt(Patchseq_NN_memb, select.cl, 1)
 Tree = Get_nth_predicted_bt(Patchseq_Tree_memb, select.cl, 1)
 plot_geomdensity_categorized(Tree,  NN, category_names = c("Tree", "NN"), xlabel = "Confidence")
@@ -435,44 +537,6 @@ ggplot(tmp, aes(cor, fill = Method)) +
   geom_density(alpha = 0.5) +
   xlab("Correlation with the best cluster") + ylab("Density")
 
-
-################################################################################################
-####################################### River plot #############################################
-source(paste0( Where, "/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Plot_utils.R"))
-library(dplyr)
-
-tmp <- results %>% 
-  rownames_to_column("id") %>% 
-  dplyr::select(id ,Tree_id, Tree_call, Tree_color, Old_id, Old_call, Old_color) %>%
-  `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
-                  "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
-
-river_plot(tmp, min.cells=0, min.frac=0)
-
-tmp <- results %>% 
-  rownames_to_column("id") %>% 
-  dplyr::select(id ,NN_id, NN_call, NN_color, Old_id, Old_call, Old_color) %>%
-  `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
-                  "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
-
-river_plot(tmp, min.cells=0, min.frac=0)
-
-tmp <- results %>% 
-  rownames_to_column("id") %>% 
-  dplyr::select(id ,Tree_id, Tree_call, Tree_color, NN_id, NN_call, NN_color) %>%
-  `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
-                  "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
-
-river_plot(tmp, min.cells=0, min.frac=0)
-
-resustudy.cells1 <- rownames(results[results$Tree_call != "PoorQ",])
-study.cells2 <- rownames(results[results$NN_call != "PoorQ",])
-list1 = set_names(results[study.cells1, "Tree_primary_bt"], study.cells1)
-list2 = set_names(results[study.cells2, "NN_primary_bt"], study.cells2)
-plot_geomdensity_categorized( list1 , list2, 
-                             category_names = c("Tree", "NN"), xlabel = "Confidence")
-plot_geomhistogram_categorized( list1 , list2, 
-                              category_names = c("Tree", "NN"), xlabel = "Confidence")
 
 
 ######################################################################################################
@@ -585,9 +649,9 @@ E_subclass_type = E_subclass_type[MET_sample_id,]
 tmp <- cbind(results[MET_sample_id, ], E_type[MET_sample_id,], E_subclass_type[MET_sample_id, ]) %>% 
   rownames_to_column("sample_id") %>%
   mutate(E_class = case_when(
-  Exc > 0.7 ~ "Exc",
-  Inh > 0.7 ~ "Inh",
-  TRUE ~ "Other")) %>%
+    Exc > 0.7 ~ "Exc",
+    Inh > 0.7 ~ "Inh",
+    TRUE ~ "Other")) %>%
   mutate(E_subclass = case_when(
     Excitatory > 0.7 ~ "Exc",
     Lamp5 > 0.7 ~ "Lamp5",
@@ -634,7 +698,7 @@ ggplot(tmp,aes(x=Variable,y=Freq,fill=Method))+
   geom_bar(stat="identity",position="dodge") +
   xlab("Class")+ylab("Class size") 
 
- 
+
 NN <- as.data.frame(table(results[study.cells, "NN_primary_subclass"])) %>% 
   filter(Var1 %in% c("Exc_subclass", "Vip", "Pvalb", "Sst", "Lamp5"))
 Tree <- as.data.frame(table(results[study.cells, "Tree_primary_subclass"])) %>% 
@@ -671,7 +735,7 @@ Build_cre_info_table <- function(ref.anno, ref.cells, ref.cl, cl) {
   cre_info <- log2(cre_info[,ref.cl]/ ref_cluster_size[ref.cl])
   cre_info
 }
-  
+
 Get_genotype_ref_probability <- function(ref.cre, cells, predicted_cl, genotype){
   genotype <- genotype[cells]
   predicted_cl <- predicted_cl[cells]
@@ -717,15 +781,15 @@ df<- df %>% rownames_to_column("id") %>%
     Best_value != -1000 & Tree == Seurat  & Tree == Best_value ~ "common_tree_Seurat",
     Best_value != -1000 & Seurat == NN  & Seurat == Best_value ~ "common_NN_Seurat",
     #Best_value != -1000 & Seurat != NN & Seurat != Tree & Tree != NN ~ colnames(df)[apply(df,1,which.max)],
-  TRUE ~ colnames(df)[apply(df,1,which.max)])) %>%
+    TRUE ~ colnames(df)[apply(df,1,which.max)])) %>%
   column_to_rownames("id")
 
 tmp <- table(df$Method)
 
 tmp<- unlist(list( tmp["missing"],tmp["common"],
-     tmp["NN"] + tmp["common_tree_NN"]+ tmp["common_NN_Seurat"],
-     tmp["Seurat"] + tmp["common_NN_Seurat"]+tmp["common_tree_Seurat"],
-     tmp["Tree"]+tmp["common_tree_NN"]+ tmp["common_tree_Seurat"]))
+                   tmp["NN"] + tmp["common_tree_NN"]+ tmp["common_NN_Seurat"],
+                   tmp["Seurat"] + tmp["common_NN_Seurat"]+tmp["common_tree_Seurat"],
+                   tmp["Tree"]+tmp["common_tree_NN"]+ tmp["common_tree_Seurat"]))
 
 barplot(tmp)
 
@@ -882,21 +946,21 @@ hist(Tree_sum_stat[Internal_node_cells, "primary_bt"])
 hist(Tree_sum_stat[PoorQ_cells, "primary_bt"])
 
 plot_cl_cor_cat(core.cells = Leaf_node_cells, 
-                      intermediate.cells = Internal_node_cells, 
-                      lowQ.cells  = PoorQ_cells, 
-                      cell_cat = c("Leaf node cells", "Internal_node_cells", "PoorQ_cells"))
+                intermediate.cells = Internal_node_cells, 
+                lowQ.cells  = PoorQ_cells, 
+                cell_cat = c("Leaf node cells", "Internal_node_cells", "PoorQ_cells"))
 
 
 plot_cl_cor_cat(core.cells = Tree.Core.cells, 
-                      intermediate.cells = Tree.intermediate.cells, 
-                      lowQ.cells  = Tree.poorQ.cells, 
-                      cell_cat = c("Core_cells", "Intermediate_cells", "PoorQ_cells"))
+                intermediate.cells = Tree.intermediate.cells, 
+                lowQ.cells  = Tree.poorQ.cells, 
+                cell_cat = c("Core_cells", "Intermediate_cells", "PoorQ_cells"))
 
 
 plot_cl_cor_cat(core.cells = NN.Core.cells, 
-                      intermediate.cells = NN.intermediate.cells, 
-                      lowQ.cells  = NN.poorQ.cells, 
-                      cell_cat = c("Core_cells", "Intermediate_cells", "PoorQ_cells"))
+                intermediate.cells = NN.intermediate.cells, 
+                lowQ.cells  = NN.poorQ.cells, 
+                cell_cat = c("Core_cells", "Intermediate_cells", "PoorQ_cells"))
 
 
 study.cells <- Leaf_node_cells[!Leaf_node_cells %in% Tree.Core.cells]

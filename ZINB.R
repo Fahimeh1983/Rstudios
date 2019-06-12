@@ -1,6 +1,7 @@
 ##########################################################################################
 ### Reading the counts: ##################################################################
 ##########################################################################################
+ANALYSIS_FOR_GOOD_CELLS = FALSE
 
 source("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R")
 #devtools::install_github("AllenInstitute/scrattch.io", ref = "dev")
@@ -16,28 +17,32 @@ library(scrattch.io)
 work.dir = "/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/patchseq-work-dir/Patchseq_vs_FACs_cre_analysis/mouse_patchseq_VISp_20181220_collapsed40_cpm/"
 tome <- "//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/tomes/facs/mouse_V1_ALM_20180520/transcrip.tome"
 markers.path <- "/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2.3.1/select.markers.rda"
+markers.path <- "/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2.3.1/select.markers.rda"
+markers.path <- paste0(work.dir, "/250_markers.rda")
 
 # Sample annotations
 # Will throw Warnings, but these are OK - just because of how NAs are stored in HDF5 files.
-FACS.anno <- read_tome_anno(tome)
+#FACS.anno <- read_tome_anno(tome)
 # Read all counts as sparse matrix
 # These are stored in samples (rows) x genes (columns) format
-exon_counts <- read_tome_dgCMatrix(tome = tome, target = "/data/exon")
-intron_counts <- read_tome_dgCMatrix(tome = tome, target = "/data/intron")
-FACS.counts <- exon_counts + intron_counts
-colnames(FACS.counts) <- read_tome_gene_names(tome)
-rownames(FACS.counts) <- read_tome_sample_names(tome)
+#exon_counts <- read_tome_dgCMatrix(tome = tome, target = "/data/exon")
+#intron_counts <- read_tome_dgCMatrix(tome = tome, target = "/data/intron")
+#FACS.counts <- exon_counts + intron_counts
+#colnames(FACS.counts) <- read_tome_gene_names(tome)
+#rownames(FACS.counts) <- read_tome_sample_names(tome)
 # See everything stored in the tome
 #h5ls(tome)
-print("Done!")
+#print("Done!")
 
+load(paste0(work.dir, "/Counts/FACS_anno.rda"))
+load(paste0(work.dir, "/Counts/FACS_counts.rda"))
 
 load(markers.path)
 #Long_markers_list <- select.markers
-Long_markers_list <- sample(select.markers, 1000)
-Long_markers_list[grepl( "Rik" , Long_markers_list) ]  <- paste0("rename",Long_markers_list[grepl( "Rik" , Long_markers_list) ])
-Long_markers_list <- gsub("-", "_", Long_markers_list)
-rm(select.markers)
+#Long_markers_list <- sample(select.markers, 1000)
+#Long_markers_list[grepl( "Rik" , Long_markers_list) ]  <- paste0("rename",Long_markers_list[grepl( "Rik" , Long_markers_list) ])
+#Long_markers_list <- gsub("-", "_", Long_markers_list)
+#rm(select.markers)
 short_markers_list <- c("Npy", "Npy1r", "Npy2r", "Npy5r",
                         "Sst" ,"Sstr1", "Sstr2", "Sstr3", "Sstr4", "Cort",
                         "Vip", "Vipr1", "Vipr2",
@@ -56,7 +61,6 @@ short_markers_list <- c("Npy", "Npy1r", "Npy2r", "Npy5r",
                         "Nts", "Ntsr1", "Ntsr2",
                         "Nmb", "Nmbr")
 
-
 #Removing all low quality cells from FACS data
 LowQ_types <- c("Low Quality VISp L5 PT Ctxn3 2", "Batch Grouping VISp L5 PT Chrna6",
                 "Batch Grouping VISp L5 PT Ctxn3", "Low Quality VISp L6 CT Ptprt_2",
@@ -68,37 +72,50 @@ LowQ_types <- c("Low Quality VISp L5 PT Ctxn3 2", "Batch Grouping VISp L5 PT Chr
                 "Low Quality L4 Rspo1", "High Intronic VISp L5 Endou",
                 "Low Quality VISp L6 CT Ptprt_1")
 
-save(FACS.anno,file = paste0(work.dir, "/Counts/FACS_anno.rda"))
-save(FACS.counts,file = paste0(work.dir, "/Counts/FACS_counts.rda"))
-print("Done saving FACS.anno!!")
-#load(paste0(work.dir, "/Counts/FACS_anno.rda"))
-#load(paste0(work.dir, "/Counts/FACS_counts.rda"))
-select.cl <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
-FACS.anno <- FACS.anno[FACS.anno$cluster_label %in% select.cl,]
-rownames(FACS.anno) <- FACS.anno$sample_name
-FACS.cells <- rownames(FACS.anno)
-#FACS.counts <- FACS.counts[FACS.cells,short_markers_list]
-colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ]  <- paste0("rename",colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ])
-colnames(FACS.counts) <- gsub("-", "_", colnames(FACS.counts))
-FACS.counts <- FACS.counts[FACS.cells,Long_markers_list]
-df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
-colnames(df) <- c("Type", colnames(FACS.counts))
-dim(df)
+highQ_type <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
 
-##########################################################################################
-### Some initialization: #################################################################
-##########################################################################################
+#save(FACS.anno,file = paste0(work.dir, "/Counts/FACS_anno.rda"))
+#save(FACS.counts,file = paste0(work.dir, "/Counts/FACS_counts.rda"))
 
-temp <- table(FACS.anno$cluster_id) >= 10 
+cluster_lable_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
+
+if (ANALYSIS_FOR_GOOD_CELLS){
+  print("Analysis is being done for highQ cells!")
+  select.cl <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
+} else {
+  print("Analysis is being done for lowQ cells!")
+  select.cl <- LowQ_types
+  FIT_ZINB <- FALSE
+}
+
+temp <- table(FACS.anno[FACS.anno$cluster_label %in% highQ_type,"cluster_id"]) >= 10 
 Good_types <- as.numeric(names(temp[temp]))
 Good_pairs <- t(combn(Good_types, 2))
 #Adding pure types as 1_1, 2_2 and ...
 for (t in Good_types) {
   Good_pairs <- rbind(Good_pairs, c(t, t))
 }
+
+FACS.anno <- FACS.anno[FACS.anno$cluster_label %in% select.cl,]
+rownames(FACS.anno) <- FACS.anno$sample_name
+FACS.cells <- rownames(FACS.anno)
+FACS.counts <- FACS.counts[FACS.cells,short_markers_list]
+colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ]  <- paste0("rename",colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ])
+colnames(FACS.counts) <- gsub("-", "_", colnames(FACS.counts))
+#FACS.counts <- FACS.counts[FACS.cells,Long_markers_list]
+df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
+colnames(df) <- c("Type", colnames(FACS.counts))
+dim(df)
+
+
+##########################################################################################
+### Some initialization: #################################################################
+##########################################################################################
+
 #genes <- short_markers_list
 genes <- Long_markers_list
-save(Long_markers_list, file = paste0(work.dir,"/1000_markers.rda"))
+#save(Long_markers_list, file = paste0(work.dir,"/1000_markers.rda"))
+
 ##########################################################################################
 ### fit ZINB or NB or logit per gene per Type: ###########################################
 ##########################################################################################
@@ -115,8 +132,11 @@ for (t in Good_types) {
   end_time = Sys.time()
   print(end_time - start_time)
 }
-
-save(All_fit_values, file=paste0(work.dir,"/1000_fit_values.rda"))
+load(paste0(work.dir,"/47_fit_values.rda"))
+save(All_fit_values, file=paste0(work.dir,"/200_fit_values.rda"))
+save(All_fit_values, file=paste0(work.dir,"/47_fit_values.rda"))
+Long_markers_list <- short_markers_list
+save(Long_markers_list, file = paste0(work.dir, "/47_markers.rda"))
 df <- t(df)
 
 ##########################################################################################
@@ -126,7 +146,7 @@ df <- t(df)
 Beta_list <- list()
 Finaldf <- list()
 
-for (run_iter in 4:5){
+for (run_iter in 1:1){
   ##########################################################################################
   ### Find Beta for each pair of cell type using an optimizer: #############################
   ##########################################################################################
@@ -177,8 +197,8 @@ for (run_iter in 4:5){
   }
   print("Done!")
   
-  Beta_file_name = paste0(FACS.cells[run_iter],"_Beta.rda")
-  save(Beta_list, file=paste0(work.dir, "/Beta_files/",Beta_file_name))
+  #Beta_file_name = paste0(FACS.cells[run_iter],"_Beta.rda")
+  #save(Beta_list, file=paste0(work.dir, "/Beta_files/",Beta_file_name))
   
   ##########################################################################################
   ### Find the probability of the observation given Beta: ##################################
@@ -229,7 +249,6 @@ for (run_iter in 4:5){
   ### Find the probability of the observation given Beta: ##################################
   ##########################################################################################
   
-  cluster_lable_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
   cell <- FACS.cells[run_iter]
 
   py <- list()
@@ -260,24 +279,65 @@ for (run_iter in 4:5){
   }
 } 
 
+Finaldf[[cell]][order(Finaldf[[cell]][,"logp"], decreasing = TRUE),][1:10,]
+
 
 #is U and V contamination symmetric?!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ##########################################################################################
 ### Find the probability of the observation given Beta: ##################################
 ##########################################################################################
+GOOD <- GOOD.FACS.cells
+GOOD.FACS.cells <- GOOD.FACS.cells[1:1000] #I did the analysis for these cells
+BAD.FACS.cells # I also did analysis for these cells
 
 output <- list()
-for (run_iter in 1:650){
-  print(run_iter)
-  select.cell <- FACS.cells[run_iter]
-  load(paste0(work.dir, "ZINB_results_files/", FACS.cells[run_iter],"_results.rda"))
-  output[[select.cell]] <- Finaldf[[select.cell]]
+for (run_iter in 1:589){
+   #if (!run_iter %in% c(3,16, 47, 78, 290, 291, 292, 293, 501, 503, 505, 507, 518, 522, 523, 529, 531, 534, 537, 540, 546, 553, 556, 560, 562, 564, 568, 572,  574, 578, 581, 586)){
+  #if (!run_iter %in% c(70, 338, 410, 425, 521, 616, 676, 948)){ #Good cells 250
+  #if (!run_iter %in% c(948)){ #Good cells 1000
+    print(run_iter)
+    select.cell <- BAD.FACS.cells[run_iter]
+    load(paste0(work.dir, "/ZINB_outputs_250genes/",  "ZINB_results_files/", BAD.FACS.cells[run_iter],"_results.rda"))
+    output[[select.cell]] <- Finaldf[[select.cell]]
+  #}
 }
 
-run_iter = 369
-select.cell <- FACS.cells[run_iter]
-ggplot(output[[select.cell]][!is.na(output[[select.cell]][,"logp"]),], aes(logp, B, colour = pair_identity)) + 
-  geom_point(alpha = 0.4) + xlab("Log(p)") + ylab("B")
+output.BAD.cells.250 <- output
 
+study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality VISp L5 PT Ctxn3 2", "sample_name"]
+study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality VISp L6 CT Ptprt_2", "sample_name"]
+study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality VISp L5 PT Ctxn3 1", "sample_name"]
+study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality ALM L6 CT Cpa6", "sample_name"]
+study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality Meis2 Adamts19", "sample_name"]
+study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality VISp L6 CT Ptprt_1", "sample_name"]
+study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality Astro Aqp4", "sample_name"]
+study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality Sst Chodl", "sample_name"]
+
+output <- output.BAD.cells.250
+select.cell <- study.cells[[1]][3]
 output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
+
+output <- output.BAD.cells.1000
+output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
+
+study.cells <- GOOD.FACS.cells
+select.cell <- GOOD.FACS.cells[1]
+output <- output.GOOD.cells.250
+output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
+
+#select.cell <- BAD.FACS.cells[run_iter]
+#ggplot(output[[select.cell]][!is.na(output[[select.cell]][,"logp"]),], aes(logp, B, colour = pair_identity)) + 
+#  geom_point(alpha = 0.4) + xlab("Log(p)") + ylab("B")
+
+
+correct <- c()
+output <- output.GOOD.cells.1000
+cells <- names(output)
+
+for (c in cells){
+  output[[c]] <- output[[c]][order(output[[c]][,"logp"], decreasing = TRUE),]
+  correct <- c(correct, sum(output[[c]][1,"cluster_label"] == output[[c]][1,"cl1"] & 
+        output[[c]][1,"cluster_label"] == output[[c]][1,"cl2"]))}
+
+sum(correct)/length(correct)
 
