@@ -48,32 +48,32 @@ LowQ_types <- c("Low Quality VISp L5 PT Ctxn3 2", "Batch Grouping VISp L5 PT Chr
                 "Low Quality L4 Rspo1", "High Intronic VISp L5 Endou",
                 "Low Quality VISp L6 CT Ptprt_1")
 
+contaminated_types <- c("Doublet SMC and Glutamatergic", "Doublet Astro Aqp4 Ex",
+                        "Doublet Endo and Peri_1", "Doublet VISp L5 NP and L6 CT", "Doublet Endo Peri SMC")
+
 highQ_type <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
-
-
-
-temp <- table(FACS.anno[FACS.anno$cluster_label %in% highQ_type,"cluster_id"]) >= 10 
-Good_types <- as.numeric(names(temp[temp]))
-Good_pairs <- t(combn(Good_types, 2))
-#Adding pure types as 1_1, 2_2 and ...
-for (t in Good_types) {
-  Good_pairs <- rbind(Good_pairs, c(t, t))
-}
-
-load(paste0(work.dir, "Test_GOOD_cells.rda"))
-load(paste0(work.dir, "Test_BAD_cells.rda"))
+cluster_label_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
+FACS.anno <- as.data.frame(FACS.anno) 
 rownames(FACS.anno) <- FACS.anno$sample_name
-cluster_lable_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
-test.cells <- union(GOOD.cells, BAD.cells)
-FACS.anno <- FACS.anno[test.cells,]
-colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ]  <- paste0("rename",colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ])
-colnames(FACS.counts) <- gsub("-", "_", colnames(FACS.counts))
-FACS.counts <- FACS.counts[test.cells, Long_markers_list]
-sum(rownames(FACS.anno) == rownames(FACS.counts)) == length(test.cells)
-df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
-colnames(df) <- c("Type", colnames(FACS.counts))
-dim(df)
+load(paste0(work.dir, "/Test_GOOD_cells.rda"))
+load(paste0(work.dir, "/Test_BAD_cells.rda"))
+load(paste0(work.dir, "/validation_cells.rda"))
+sum(validation.cells %in% c(test.GOOD.cells, test.BAD.cells)) == 0
+sum(test.BAD.cells %in% c(test.GOOD.cells, validation.cells)) == 0
+sum(test.GOOD.cells %in% c(validation.cells, test.BAD.cells)) == 0
+test_and_validation_cells <- c(test.BAD.cells, test.GOOD.cells, validation.cells)
 
+load(paste0(work.dir, "/Good_trained_types.rda"))
+load(paste0(work.dir, "/Good_trained_pairs.rda"))
+
+#FACS.anno <- FACS.anno[test_and_validation_cells,]
+#colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ]  <- paste0("rename",colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ])
+#colnames(FACS.counts) <- gsub("-", "_", colnames(FACS.counts))
+#FACS.counts <- FACS.counts[test_and_validation_cells, Long_markers_list]
+#sum(rownames(FACS.anno) == rownames(FACS.counts)) == length(test_and_validation_cells)
+#df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
+#colnames(df) <- c("Type", colnames(FACS.counts))
+#dim(df)
 
 ##########################################################################################
 ### Some initialization: #################################################################
@@ -82,6 +82,7 @@ dim(df)
 genes <- Long_markers_list
 df <- t(df)
 load(paste0(work.dir, "/All_fit_values_1000_include47genes.rda"))
+
 ##########################################################################################
 ### Setting RUN_ITER: ####################################################################
 ##########################################################################################
@@ -98,7 +99,7 @@ for (run_iter in 1:1){
     with(data, sum((par * term1 +  term2)^2))
   }
   
-  for (c in test.cells[run_iter]){
+  for (c in test_and_validation_cells[run_iter]){
     B <- list()
     p1 <- list()
     p2 <- list()
@@ -149,9 +150,9 @@ for (run_iter in 1:1){
   
   source("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/git_workspace/Rstudios/Rstudios/ZINB_helper_functions.R")
   
-  count_threshold <- max(df)
+  count_threshold <- 200000
   pyg <- list()
-  for (c in test.cells[run_iter]){
+  for (c in test_and_validation_cells[run_iter]){
     y <- df[genes,c]
     start_time = Sys.time()
     pp <- list()
@@ -185,14 +186,12 @@ for (run_iter in 1:1){
     print(end_time - start_time)
   }
   
-  #pp[which.max(unlist(l))]
-  #FACS.anno[[test.cells[run_iter], c( "cluster_id")]]
   #unlist(pp)[order(unlist(l))]
   ##########################################################################################
   ### Find the probability of the observation given Beta: ##################################
   ##########################################################################################
   
-  cell <- test.cells[run_iter]
+  cell <- test_and_validation_cells[run_iter]
 
   py <- list()
   for (c in cell){
@@ -209,8 +208,8 @@ for (run_iter in 1:1){
       logp <- c(logp , sum(log(unlist(pyg[[pair_name]]))))
       Type1 <- c(Type1, first_type)
       Type2 <- c(Type2, second_type)
-      cl1 <- c(cl1, cluster_lable_id[cluster_lable_id$cluster_id == first_type, "cluster_label"])
-      cl2 <- c(cl2, cluster_lable_id[cluster_lable_id$cluster_id == second_type, "cluster_label"])
+      cl1 <- c(cl1, cluster_label_id[cluster_label_id$cluster_id == first_type, "cluster_label"])
+      cl2 <- c(cl2, cluster_label_id[cluster_label_id$cluster_id == second_type, "cluster_label"])
     }
     py[[c]] <- cbind.data.frame(unlist(logp), unlist(Type1), unlist(Type2), unlist(cl1), unlist(cl2))
     colnames(py[[c]]) <- c("logp", "Type1", "Type2", "cl1", "cl2")
@@ -227,80 +226,117 @@ Finaldf[[cell]][order(Finaldf[[cell]][,"logp"], decreasing = TRUE),][1:10,]
 
 #is U and V contamination symmetric?!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ##########################################################################################
-### Find the probability of the observation given Beta: ##################################
+### Looking at the results: ##############################################################
 ##########################################################################################
-GOOD <- GOOD.FACS.cells
-GOOD.FACS.cells <- GOOD.FACS.cells[1:1000] #I did the analysis for these cells
-BAD.FACS.cells # I also did analysis for these cells
+all_test_cells <- union(test.BAD.cells, test.GOOD.cells)
+validation.cells <- validation.cells
+contaminated.cells <- FACS.anno[FACS.anno$cluster_label %in% contaminated_types, "sample_name"]
 
-output <- list()
-for (run_iter in 1:589){
-   #if (!run_iter %in% c(3,16, 47, 78, 290, 291, 292, 293, 501, 503, 505, 507, 518, 522, 523, 529, 531, 534, 537, 540, 546, 553, 556, 560, 562, 564, 568, 572,  574, 578, 581, 586)){
-  #if (!run_iter %in% c(70, 338, 410, 425, 521, 616, 676, 948)){ #Good cells 250
-  #if (!run_iter %in% c(948)){ #Good cells 1000
-  if (!run_iter %in% c(68, 220)){ #bad cells 47
-  #if (!run_iter %in% c(70, 331, 338, 408, 409, 410, 411, 412, 413, 414, 415, 416, 418, 422, 424, 425, 426, 427, 428, 429, 430, 431, 432, 434, 435, 436, 437, 438, 439, 444, 
-  #                     447, 448, 449, 450, 452, 521, 616, 676, 690, 929, 933, 948, 955)){ #good cells 47
-    print(run_iter)
-    select.cell <- BAD.FACS.cells[run_iter]
-    load(paste0(work.dir,   "ZINB_results_files/", BAD.FACS.cells[run_iter],"_results.rda"))
-    output[[select.cell]] <- Finaldf[[select.cell]]
+test_output <- list()
+validation_output <- list()
+done_test_cells <- c()
+done_validation_cells <- c()
+for (run_iter in 1:5089){
+  cell_name <- test_and_validation_cells[run_iter]
+  file_name <- paste0(work.dir,   "ZINB_results_files/", cell_name,"_results.rda")
+  if (file.exists(file_name)) {
+    if (cell_name %in% all_test_cells){
+      done_test_cells <- c(done_test_cells, cell_name)
+      load(file_name)
+      test_output[[cell_name]] <- Finaldf[[cell_name]]
+      }
+    else if (cell_name %in% validation.cells) { 
+      done_validation_cells <- c(done_validation_cells, cell_name)
+      load(file_name)
+      validation_output[[cell_name]] <- Finaldf[[cell_name]]
+      }
+    else{print("Something is wrong")}
   }
 }
 
-output.BAD.cells.47 <- output
-
-study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality VISp L5 PT Ctxn3 2", "sample_name"]
-study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality VISp L6 CT Ptprt_2", "sample_name"]
-study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality VISp L5 PT Ctxn3 1", "sample_name"]
-study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality ALM L6 CT Cpa6", "sample_name"]
-study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality Meis2 Adamts19", "sample_name"]
-study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality VISp L6 CT Ptprt_1", "sample_name"]
-study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality Astro Aqp4", "sample_name"]
-study.cells <- FACS.anno[FACS.anno$cluster_label == "Low Quality Sst Chodl", "sample_name"]
-
-output <- output.BAD.cells.47
-select.cell <- study.cells[[1]][3]
-output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
-
-output <- output.BAD.cells.250
-select.cell <- study.cells[[1]][3]
-output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
-
-output <- output.BAD.cells.1000
-output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
-
-
-study.cells <- GOOD.FACS.cells
-select.cell <- "LS-15003_S52_E1-50"
-output <- output.GOOD.cells.47
-output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
-
-output <- output.GOOD.cells.250
-output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
-
-output <- output.GOOD.cells.1000
-output[[select.cell]][order(output[[select.cell]][,"logp"], decreasing = TRUE),][1:10,]
-
-#select.cell <- BAD.FACS.cells[run_iter]
-#ggplot(output[[select.cell]][!is.na(output[[select.cell]][,"logp"]),], aes(logp, B, colour = pair_identity)) + 
-#  geom_point(alpha = 0.4) + xlab("Log(p)") + ylab("B")
-
-plot(c(0.72, 0.91, 0.95), type="o", col="blue", ylim = c(0,1), axes=FALSE, xlab = "", ylab="% Correct predictions for GOOD cells")
-axis(1, at=1:3, lab=c("47genes","250genes","1000genes"))
-axis(2, las=1)
-text(x=1.3, y=0.71,labels = "0.72")
-axis(2, las=1, at=4*0:g_range[2])
-
-
+# computing the accuracy on the good cells, we remove the poorQ cells for this part 
 correct <- c()
-output <- output.GOOD.cells.47
-cells <- names(output)
+combined_output <- c(test_output, validation_output)
+for (c in setdiff(c(done_validation_cells, done_test_cells), test.BAD.cells)){
+  combined_output[[c]] <- combined_output[[c]][order(combined_output[[c]][,"logp"], decreasing = TRUE),]
+  tmp <- combined_output[[c]][1,"cluster_label"] == combined_output[[c]][1,"cl1"] & 
+        combined_output[[c]][1,"cluster_label"] == combined_output[[c]][1,"cl2"]
+  correct <- c(correct, tmp)
+}
 
-for (c in cells){
-  output[[c]] <- output[[c]][order(output[[c]][,"logp"], decreasing = TRUE),]
-  correct <- c(correct, sum(output[[c]][1,"cluster_label"] == output[[c]][1,"cl1"] & 
-        output[[c]][1,"cluster_label"] == output[[c]][1,"cl2"]))}
+sum(correct)/length(correct) #80% accuarcy on the good cells
 
-sum(correct)/length(correct)
+# Now we should compute the mean of logp for the validation set
+validation_best_logp <- data_frame()
+for (c in done_validation_cells) {
+  validation_output[[c]] <- validation_output[[c]][order(validation_output[[c]][,"logp"], decreasing = TRUE),]
+  if (validation_output[[c]][, "cluster_id"] == validation_output[[c]][,"Type1"] & 
+      validation_output[[c]][, "cluster_id"] == validation_output[[c]][,"Type2"]) {
+    validation_best_logp <- rbind(validation_best_logp, validation_output[[c]][1,])
+  }
+}
+
+
+validation_mean_logp <- as.data.frame(validation_best_logp %>% 
+                                        group_by(cluster_id) %>% 
+                                        summarise(mean_logp = mean(logp), min_logp = min(logp), max_logp=max(logp)))
+
+
+cell_identity <- function(cell, test.BAD.cells, test.GOOD.cells, contaminated.cells){
+  if(cell %in% test.GOOD.cells) { return(c("PURE"))}
+  if(cell %in% setdiff(test.BAD.cells, contaminated.cells)) {return(c("POORQ"))}
+  if(cell %in% contaminated.cells){return(c("CONTAMIN"))}
+}
+
+prediction_identity <- function(output_1line, cellQ, validation_mean_logp){
+  if (cellQ == "PURE"){
+    if (output_1line$Type1 == output_1line$Type2 & output_1line$cl1 == output_1line$cluster_label){return(c("PURE_PURE_CORRECT"))}
+    if (output_1line$Type1 == output_1line$Type2 & output_1line$cl1 != output_1line$cluster_label){return(c("PURE_PURE_WRONG"))}
+    if (output_1line$Type1 != output_1line$Type2){return(c("PURE_CONTAMIN"))}
+  } else if (cellQ == "POORQ") {
+    if (output_1line$Type1 == output_1line$Type2){return(check_prediction_quality(cellQ, output_1line, validation_mean_logp))}
+    if (output_1line$Type1 != output_1line$Type2){return(c("POORQ_CONTAMIN"))}
+  } else if (cellQ == "CONTAMIN") {
+    if (output_1line$Type1 == output_1line$Type2){return(check_prediction_quality(cellQ, output_1line, validation_mean_logp))}
+    if (output_1line$Type1 != output_1line$Type2){return(c("CONTAMIN_CONTAMIN"))}
+  }
+}
+
+check_prediction_quality <- function(cellQ, output_1line, validation_mean_logp){
+  if (cellQ == "POORQ"){
+    if (!is_empty(validation_mean_logp[validation_mean_logp$cluster_id == output_1line$Type1, "min_logp"])){
+      if (output_1line$logp >= validation_mean_logp[validation_mean_logp$cluster_id == output_1line$Type1, "min_logp"]){
+        return(c("POORQ_PURE"))
+      } else {return(c("POORQ_POORQ"))}
+    }else{return(NaN)}
+  }
+  if (cellQ == "CONTAMIN"){
+    if (!is_empty(validation_mean_logp[validation_mean_logp$cluster_id == output_1line$Type1, "min_logp"])){
+      if (output_1line$logp >= validation_mean_logp[validation_mean_logp$cluster_id == output_1line$Type1, "min_logp"]){
+        return(c("CONTAMIN_PURE"))
+      } else {return(c("CONTAMIN_POORQ"))}
+    } else{return(NaN)}
+  }
+}
+
+prediction <- c()
+for (c in done_test_cells){
+  cellQ <- cell_identity(c, test.BAD.cells, test.GOOD.cells, contaminated.cells)
+  tmp <- test_output[[c]][order(test_output[[c]][,"logp"], decreasing = TRUE),][1,]
+  prediction <- c(prediction, prediction_identity(tmp, cellQ, validation_mean_logp))
+}
+
+sum(prediction == "PURE_PURE_CORRECT") / sum(prediction == "PURE_PURE_CORRECT" | prediction == "PURE_PURE_WRONG" | prediction == "PURE_PURE_CONTAMIN")
+sum(prediction == "PURE_PURE_WRONG") / sum(prediction == "PURE_PURE_CORRECT" | prediction == "PURE_PURE_WRONG" | prediction == "PURE_PURE_CONTAMIN")
+sum(prediction == "POORQ_POORQ") / sum(prediction == "POORQ_POORQ" | prediction == "POORQ_PURE" | prediction == "POORQ_CONTAMIN")
+sum(prediction == "CONTAMIN_CONTAMIN") / sum(prediction == "CONTAMIN_PURE" | prediction == "CONTAMIN_POORQ" | prediction == "CONTAMIN_CONTAMIN")
+
+temp <- c()
+for (c in done_test_cells[prediction == "POORQ_PURE"]) {
+  temp <- rbind(temp, test_output[[c]][order(test_output[[c]][,"logp"], decreasing = TRUE),][1,])
+}
+temp 
+
+ggplot(melt(cbind(Good_test_cells, Bad_test_cells, contaminated_test_cells)), aes(value  , fill = Var2)) + 
+  geom_density(alpha = 0.5) + xlab("Min(logp) - predicted(logp)") + ylab("Density")
 

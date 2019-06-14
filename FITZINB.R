@@ -73,28 +73,33 @@ LowQ_types <- c("Low Quality VISp L5 PT Ctxn3 2", "Batch Grouping VISp L5 PT Chr
                 "Low Quality VISp L6 CT Ptprt_1")
 
 highQ_type <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
-#GOOD.cells <- sample(rownames(FACS.anno)[FACS.anno$cluster_label %in% highQ_type], 1000)
-#BAD.cells <- rownames(FACS.anno)[FACS.anno$cluster_label %in% LowQ_types]
-#save(GOOD.cells, file=paste0(work.dir, "Test_GOOD_cells.rda"))
-#save(BAD.cells, file=paste0(work.dir, "Test_BAD_cells.rda"))
-#save(Long_markers_list, file = paste0(work.dir, "1000_marker_genes_include47.rda"))
-
-load(paste0(work.dir, "Test_GOOD_cells.rda"))
-load(paste0(work.dir, "Test_BAD_cells.rda"))
+FACS.anno <- as.data.frame(FACS.anno) 
 rownames(FACS.anno) <- FACS.anno$sample_name
-train.cells <- setdiff(rownames(FACS.anno), c(GOOD.cells, BAD.cells))
-cluster_lable_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
+#test.BAD.cells <- FACS.anno[FACS.anno$cluster_label %in% LowQ_types, "sample_name"]
+#all.GOOD.cells <- FACS.anno[!FACS.anno$cluster_label %in% LowQ_types, "sample_name"]
+#test.GOOD.cells <- sample(all.GOOD.cells, 2000)
+#validation.cells <- sample(setdiff(all.GOOD.cells, test.GOOD.cells), 2500)
+#tmp<- table(FACS.anno[validation.cells, "cluster_label"])
+#sort(tmp, decreasing = TRUE)
+#length(tmp)
+#train.cells <- setdiff(rownames(FACS.anno), c(test.BAD.cells, test.GOOD.cells, validation.cells))
+#save(test.GOOD.cells, file = paste0(work.dir, "/Test_GOOD_cells.rda"))
+#save(test.BAD.cells, file = paste0(work.dir, "/Test_BAD_cells.rda"))
+#save(validation.cells, file = paste0(work.dir, "/validation_cells.rda"))
+#save(train.cells, file = paste0(work.dir, "/train_cells.rda"))
+load(paste0(work.dir, "/Test_GOOD_cells.rda"))
+load(paste0(work.dir, "/Test_BAD_cells.rda"))
+load(paste0(work.dir, "/validation_cells.rda"))
+load(paste0(work.dir, "/train_cells.rda"))
+sum(validation.cells %in% c(test.GOOD.cells, test.BAD.cells, train.cells)) == 0
+sum(test.BAD.cells %in% c(test.GOOD.cells, validation.cells, train.cells)) == 0
+sum(test.GOOD.cells %in% c(validation.cells, test.BAD.cells, train.cells)) == 0
+sum(train.cells %in% c(test.GOOD.cells, test.BAD.cells, validation.cells)) == 0
+dim(FACS.anno)
+#cluster_lable_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
 FACS.anno <- FACS.anno[train.cells,] #We removed the test cells from the anno file
 FACS.counts <- FACS.counts[train.cells, ]#We removed the test cells from the anno file
-
-#if (ANALYSIS_FOR_GOOD_CELLS){
-#  print("Analysis is being done for highQ cells!")
-#  select.cl <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
-#} else {
-#  print("Analysis is being done for lowQ cells!")
-#  select.cl <- LowQ_types
-#  FIT_ZINB <- FALSE
-#}
+dim(FACS.anno)
 
 temp <- table(FACS.anno[FACS.anno$cluster_label %in% highQ_type,"cluster_id"]) >= 10 
 Good_types <- as.numeric(names(temp[temp]))
@@ -103,8 +108,8 @@ Good_pairs <- t(combn(Good_types, 2))
 for (t in Good_types) {
   Good_pairs <- rbind(Good_pairs, c(t, t))
 }
-
-rownames(FACS.anno) <- FACS.anno$sample_name
+save(Good_types, file = paste0(work.dir, "/Good_trained_types.rda"))
+save(Good_pairs, file = paste0(work.dir, "/Good_trained_pairs.rda"))
 colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ]  <- paste0("rename",colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ])
 colnames(FACS.counts) <- gsub("-", "_", colnames(FACS.counts))
 FACS.counts <- FACS.counts[train.cells, Long_markers_list]
@@ -142,5 +147,31 @@ if (FIT_ZINB){
 } else {
   load(paste0(work.dir, "/All_fit_values_1000_include47genes.rda"))
 }
+
+##########################################################################################
+### Compute median gene expression in each type: #########################################
+##########################################################################################
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+median_expression <- data_frame()
+row_names <- c()
+t_type <- c()
+for (t in Good_types){
+  print(t)
+  new_df <- df[df$Type == t ,]
+  row_names <- c(row_names, paste0("median_of_type_", t))
+  t_type <- c(t_type, t)
+  median_expression <- rbind(median_expression, colMedians(as.matrix(new_df[-1])))
+}
+
+colnames(median_expression) <- colnames(df[-1])
+rownames(median_expression) <- row_names
+median_expression <- cbind(median_expression, t_type)
+
+save(median_expression, file = paste0(work.dir, "/median_expression.rda"))
+df <- t(median_expression)
 
 
