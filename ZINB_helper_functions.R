@@ -28,7 +28,8 @@ Fit_model <- function(data.df, gene, type_id){
   model_name = paste0(type_id,"_", gene)
   sub_df <- data.df[, gene]
   if (length(sub_df) >= 10) {
-    if (all(sub_df == 0)){
+    if ((sum(sub_df !=0) / length(sub_df)) < 0.1){
+    #if (all(sub_df == 0)){
       result <- logit_fit(model_name)
     } else if (all(sub_df != 0)){
       eq = paste0(as.character(gene), " ~ 1")

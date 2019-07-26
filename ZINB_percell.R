@@ -1,5 +1,4 @@
 .libPaths("/home/fahimehb/R/x86_64-redhat-linux-gnu-library/3.5")
-FIT_ZINB =  FALSE 
 COMPUTE_BETA = TRUE 
 COMPUTE_LIKELIHOOD = TRUE 
 AGGREGATE_RESULTS = TRUE
@@ -9,7 +8,6 @@ run_iter = as.numeric(args[1])
 ##########################################################################################
 ### Reading the counts: ##################################################################
 ##########################################################################################
-
 source("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R")
 #devtools::install_github("AllenInstitute/scrattch.io", ref = "dev")
 require(ggplot2)
@@ -23,11 +21,14 @@ library(scrattch.io)
 
 work.dir = "/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/patchseq-work-dir/Patchseq_vs_FACs_cre_analysis/mouse_patchseq_VISp_20181220_collapsed40_cpm/"
 tome <- "//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/tomes/facs/mouse_V1_ALM_20180520/transcrip.tome"
+cpm <- "//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/facs_seq/mouse_V1_ALM_20180520/data.feather"
 #markers.path <- "/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2.3.1/select.markers.rda"
-markers.path <- paste0(work.dir, "/1000_markers.rda")
+#markers.path <- paste0(work.dir, "/1000_marker_genes_include47.rda")
+markers.path <- paste0(work.dir, "/select.markers.rda")
 
 # Sample annotations
 # Will throw Warnings, but these are OK - just because of how NAs are stored in HDF5 files.
+cpm_counts <- read_feather(cpm)
 #FACS.anno <- read_tome_anno(tome)
 # Read all counts as sparse matrix
 # These are stored in samples (rows) x genes (columns) format
@@ -39,111 +40,81 @@ markers.path <- paste0(work.dir, "/1000_markers.rda")
 # See everything stored in the tome
 #h5ls(tome)
 #print("Done!")
-
+#save(FACS.anno,file = paste0(work.dir, "/Counts/FACS_anno.rda"))
+#save(FACS.counts,file = paste0(work.dir, "/Counts/FACS_counts.rda"))
+load(paste0(work.dir, "/Counts/FACS_anno.rda"))
+#load(paste0(work.dir, "/Counts/FACS_counts.rda"))
 load(markers.path)
-print("Done loading markers list!!")
-#Long_markers_list <- select.markers
-#Long_markers_list <- sample(select.markers, 500)
-#Long_markers_list[grepl( "Rik" , Long_markers_list) ]  <- paste0("rename",Long_markers_list[grepl( "Rik" , Long_markers_list) ])
-#Long_markers_list <- gsub("-", "_", Long_markers_list)
-#rm(select.markers)
-short_markers_list <- c("Npy", "Npy1r", "Npy2r", "Npy5r", 
-                        "Sst" ,"Sstr1", "Sstr2", "Sstr3", "Sstr4", "Cort",
-                        "Vip", "Vipr1", "Vipr2",
-                        "Tac2", "Tacr3", 
-                        "Cck", "Cckbr", 
-                        "Penk", "Oprd1", "Oprm1", 
-                        "Crh", "Crhr1", "Crhr2",
-                        "Tac1", "Tacr1", 
-                        "Pdyn", "Oprk1", 
-                        "Pthlh","Pth1r",
-                        "Pnoc", "Oprl1",
-                        "Trh", "Trhr", "Trhr2", 
-                        "Grp", "Grpr",
-                        "Rln1", "Rxfp1", "Rxfp2", "Rxfp3", 
-                        "Adcyap1", "Adcyap1r1", 
-                        "Nts", "Ntsr1", "Ntsr2", 
-                        "Nmb", "Nmbr")
 
+FACS.anno <- as.data.frame(FACS.anno) 
+Long_markers_list <- select.markers
+cpm_counts <- cpm_counts[,c("sample_id",Long_markers_list)]
+cpm_counts <- as.data.frame(cpm_counts)
+rownames(cpm_counts) <- cpm_counts$sample_id
+cpm_counts <- cpm_counts[,setdiff(colnames(cpm_counts), "sample_id")]
+FACS.counts <- cpm_counts
+rm(cpm_counts)
 
 #Removing all low quality cells from FACS data
 LowQ_types <- c("Low Quality VISp L5 PT Ctxn3 2", "Batch Grouping VISp L5 PT Chrna6",
                 "Batch Grouping VISp L5 PT Ctxn3", "Low Quality VISp L6 CT Ptprt_2",
-                "Low Quality VISp L5 PT Ctxn3 1", "Doublet SMC and Glutamatergic", 
-                "Doublet Astro Aqp4 Ex", "Low Quality ALM L6 CT Cpa6", 
+                "Low Quality VISp L5 PT Ctxn3 1", "Doublet SMC and Glutamatergic",
+                "Doublet Astro Aqp4 Ex", "Low Quality ALM L6 CT Cpa6",
                 "Low Quality Meis2 Adamts19 ", "Doublet Endo and Peri_1",
-                "Doublet VISp L5 NP and L6 CT", "Low Quality Sst Chodl", 
-                "Low Quality Astro Aqp4" , "Doublet Endo Peri SMC", 
+                "Doublet VISp L5 NP and L6 CT", "Low Quality Sst Chodl",
+                "Low Quality Astro Aqp4" , "Doublet Endo Peri SMC",
                 "Low Quality L4 Rspo1", "High Intronic VISp L5 Endou",
                 "Low Quality VISp L6 CT Ptprt_1")
 
-#save(FACS.anno,file = paste0(work.dir, "/Counts/FACS_anno.rda"))
-#save(FACS.counts,file = paste0(work.dir, "/Counts/FACS_counts.rda"))
-#print("Done saving FACS.anno!!")
-load(paste0(work.dir, "/Counts/FACS_anno.rda"))
-load(paste0(work.dir, "/Counts/FACS_counts.rda"))
-select.cl <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
-FACS.anno <- FACS.anno[FACS.anno$cluster_label %in% select.cl,]
+highQ_type <- setdiff(unique(FACS.anno$cluster_label), LowQ_types)
+cluster_label_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
+FACS.anno <- as.data.frame(FACS.anno) 
 rownames(FACS.anno) <- FACS.anno$sample_name
-FACS.cells <- rownames(FACS.anno)
-#FACS.counts <- FACS.counts[FACS.cells,short_markers_list]
+load(paste0(work.dir, "/Test_GOOD_cells.rda"))
+load(paste0(work.dir, "/Test_BAD_cells.rda"))
+load(paste0(work.dir, "/validation_cells.rda"))
+sum(validation.cells %in% c(test.GOOD.cells, test.BAD.cells)) == 0
+sum(test.BAD.cells %in% c(test.GOOD.cells, validation.cells)) == 0
+sum(test.GOOD.cells %in% c(validation.cells, test.BAD.cells)) == 0
+test_and_validation_cells <- c(test.BAD.cells, test.GOOD.cells, validation.cells)
+
+load(paste0(work.dir, "/Good_trained_types.rda"))
+load(paste0(work.dir, "/Good_trained_pairs.rda"))
+
+FACS.anno <- FACS.anno[test_and_validation_cells,]
 colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ]  <- paste0("rename",colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ])
 colnames(FACS.counts) <- gsub("-", "_", colnames(FACS.counts))
-FACS.counts <- FACS.counts[FACS.cells,Long_markers_list]
+Long_markers_list[grepl( "Rik" , Long_markers_list)] <-  paste0("rename", Long_markers_list[grepl( "Rik" , Long_markers_list) ])
+Long_markers_list <- gsub("-", "_", Long_markers_list)
+FACS.counts <- FACS.counts[test_and_validation_cells, Long_markers_list]
+sum(rownames(FACS.anno) == rownames(FACS.counts)) == length(test_and_validation_cells)
 df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
 colnames(df) <- c("Type", colnames(FACS.counts))
-print(dim(df))
+tmp<- rownames(df)
+df <- cbind.data.frame(lapply(df, as.integer))
+rownames(df) <- tmp
+dim(df)
+
 ##########################################################################################
 ### Some initialization: #################################################################
 ##########################################################################################
 
-temp <- table(FACS.anno$cluster_id) >= 10 
-Good_types <- as.numeric(names(temp[temp]))
-Good_pairs <- t(combn(Good_types, 2))
-#Adding pure types as 1_1, 2_2 and ...
-for (t in Good_types) {
-  Good_pairs <- rbind(Good_pairs, c(t, t))
-}
-#genes <- short_markers_list
 genes <- Long_markers_list
-print("Done initialization!!!")
-##########################################################################################
-### fit ZINB or NB or logit per gene per Type: ###########################################
-##########################################################################################
-
-source("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/git_workspace/Rstudios/Rstudios/ZINB_helper_functions.R")
-if (FIT_ZINB){
-  All_fit_values <- list()
-  for (t in Good_types) {
-    print(c("Type:", t))
-    new_df <- df[df$Type == t ,]
-    Fit_values <- tapply(1:nrow(new_df), as.character(new_df$Type), function(x) sapply(colnames(new_df)[-1], function(g)Fit_model(new_df[x,], g, t)))
-    All_fit_values <- c(All_fit_values, Fit_values)
-  }
-  save(All_fit_values, file=paste0(work.dir,"/All_fit_values.rda"))
-} else {
-load(paste0(work.dir,"/1000_fit_values.rda")) 
-} 
 df <- t(df)
-
-##########################################################################################
-### Setting RUN_ITER: ####################################################################
-##########################################################################################
-
-#run_iter <- 3000
+load(paste0(work.dir, "/All_fit_values_4020.rda"))
 
 ##########################################################################################
 ### Find Beta for each pair of cell type using an optimizer: #############################
 ##########################################################################################
-
+print(c("running calculation for cell:", test_and_validation_cells[run_iter]))
 Err <- function(data, par) {
   with(data, sum((par * term1 +  term2)^2))
 }
 
-Beta_file_name = paste0(FACS.cells[run_iter],"_Beta.rda")
+Beta_file_name = paste0(test_and_validation_cells[run_iter],"_Beta.rda")
 if (COMPUTE_BETA){
   Beta_list <- list()
-  for (c in FACS.cells[run_iter]){
+  for (c in test_and_validation_cells[run_iter]){
     B <- list()
     p1 <- list()
     p2 <- list()
@@ -194,11 +165,11 @@ if (COMPUTE_BETA){
 
 source("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/git_workspace/Rstudios/Rstudios/ZINB_helper_functions.R")
 
-pyg_file_name = paste0(FACS.cells[run_iter],"_pyg.rda")
-count_threshold <- max(df)
+pyg_file_name = paste0(test_and_validation_cells[run_iter],"_pyg.rda")
+count_threshold <- 200000 
 if (COMPUTE_LIKELIHOOD){
   pyg <- list()
-  for (c in FACS.cells[run_iter]){
+  for (c in test_and_validation_cells[run_iter]){
     y <- df[genes,c]
     start_time = Sys.time()
     pp <- list()
@@ -239,8 +210,7 @@ if (COMPUTE_LIKELIHOOD){
 ### Find the probability of the observation given Beta: ##################################
 ##########################################################################################
 
-cluster_lable_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
-cell <- FACS.cells[run_iter]
+cell <- test_and_validation_cells[run_iter]
 
 if (AGGREGATE_RESULTS){
   Finaldf <- list()
@@ -259,8 +229,8 @@ if (AGGREGATE_RESULTS){
       logp <- c(logp , sum(log(unlist(pyg[[pair_name]]))))
       Type1 <- c(Type1, first_type)
       Type2 <- c(Type2, second_type)
-      cl1 <- c(cl1, cluster_lable_id[cluster_lable_id$cluster_id == first_type, "cluster_label"])
-      cl2 <- c(cl2, cluster_lable_id[cluster_lable_id$cluster_id == second_type, "cluster_label"])
+      cl1 <- c(cl1, cluster_label_id[cluster_label_id$cluster_id == first_type, "cluster_label"])
+      cl2 <- c(cl2, cluster_label_id[cluster_label_id$cluster_id == second_type, "cluster_label"])
     }
     py[[c]] <- cbind.data.frame(unlist(logp), unlist(Type1), unlist(Type2), unlist(cl1), unlist(cl2))
     colnames(py[[c]]) <- c("logp", "Type1", "Type2", "cl1", "cl2")
@@ -269,12 +239,12 @@ if (AGGREGATE_RESULTS){
     Finaldf[[c]][["cluster_label"]] <- FACS.anno[[cell, c( "cluster_label")]]
     Finaldf[[c]]["pair_identity"] <- ifelse(Finaldf[[c]][,"Type1"] == Finaldf[[c]][,"cluster_id"] |  Finaldf[[c]][,"Type2"] == Finaldf[[c]][,"cluster_id"] , "U_or_V", "None") 
   }
-  aggregated_results_file_name = paste0(FACS.cells[run_iter],"_results.rda")
+  aggregated_results_file_name = paste0(test_and_validation_cells[run_iter],"_results.rda")
   save(Finaldf, file=paste0(work.dir, "/ZINB_results_files/",aggregated_results_file_name))
 }
 
 
-#select.cell <- FACS.cells[run_iter]
+#select.cell <- test.cells[run_iter]
 #ggplot(Finaldf[[select.cell]][!is.na(Finaldf[[select.cell]][,"logp"]),], aes(logp, B, colour = pair_identity)) + 
 #  geom_point(alpha = 0.4) + xlab("Log(p)") + ylab("B")
 

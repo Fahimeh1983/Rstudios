@@ -2,6 +2,7 @@
 ### Reading the counts: ##################################################################
 ##########################################################################################
 source("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R")
+source("/allen/programs/celltypes/workgroups/rnaseqanalysis/yzizhen/My_R/scrattch.hicat/R/dend.markers.R")
 #devtools::install_github("AllenInstitute/scrattch.io", ref = "dev")
 require(ggplot2)
 require(pscl)
@@ -11,13 +12,17 @@ library(dplyr)
 library(tidyr)
 library(feather)
 library(scrattch.io)
+library(scrattch.hicat)
 
 work.dir = "/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/patchseq-work-dir/Patchseq_vs_FACs_cre_analysis/mouse_patchseq_VISp_20181220_collapsed40_cpm/"
-tome <- "//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/tomes/facs/mouse_V1_ALM_20180520/transcrip.tome"
-markers.path <- paste0(work.dir, "/1000_marker_genes_include47.rda")
+#tome <- "//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/tomes/facs/mouse_V1_ALM_20180520/transcrip.tome"
+cpm <- "//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/facs_seq/mouse_V1_ALM_20180520/data.feather"
+#markers.path <- paste0(work.dir, "/1000_marker_genes_include47.rda")
+markers.path <- paste0(work.dir, "/select.markers.rda")
 
 # Sample annotations
 # Will throw Warnings, but these are OK - just because of how NAs are stored in HDF5 files.
+cpm_counts <- read_feather(cpm)
 #FACS.anno <- read_tome_anno(tome)
 # Read all counts as sparse matrix
 # These are stored in samples (rows) x genes (columns) format
@@ -32,10 +37,16 @@ markers.path <- paste0(work.dir, "/1000_marker_genes_include47.rda")
 #save(FACS.anno,file = paste0(work.dir, "/Counts/FACS_anno.rda"))
 #save(FACS.counts,file = paste0(work.dir, "/Counts/FACS_counts.rda"))
 load(paste0(work.dir, "/Counts/FACS_anno.rda"))
-load(paste0(work.dir, "/Counts/FACS_counts.rda"))
+#load(paste0(work.dir, "/Counts/FACS_counts.rda"))
 load(markers.path)
 
 FACS.anno <- as.data.frame(FACS.anno) 
+Long_markers_list <- select.markers
+cpm_counts <- cpm_counts[,c("sample_id",Long_markers_list)]
+cpm_counts <- as.data.frame(cpm_counts)
+rownames(cpm_counts) <- cpm_counts$sample_id
+cpm_counts <- cpm_counts[,setdiff(colnames(cpm_counts), "sample_id")]
+FACS.counts <- cpm_counts
 
 #Removing all low quality cells from FACS data
 LowQ_types <- c("Low Quality VISp L5 PT Ctxn3 2", "Batch Grouping VISp L5 PT Chrna6",
@@ -58,10 +69,12 @@ rownames(FACS.anno) <- FACS.anno$sample_name
 load(paste0(work.dir, "/Test_GOOD_cells.rda"))
 load(paste0(work.dir, "/Test_BAD_cells.rda"))
 load(paste0(work.dir, "/validation_cells.rda"))
+load(paste0(work.dir, "/train_cells.rda"))
 sum(validation.cells %in% c(test.GOOD.cells, test.BAD.cells)) == 0
 sum(test.BAD.cells %in% c(test.GOOD.cells, validation.cells)) == 0
 sum(test.GOOD.cells %in% c(validation.cells, test.BAD.cells)) == 0
 test_and_validation_cells <- c(test.BAD.cells, test.GOOD.cells, validation.cells)
+#FACS.counts <- FACS.counts[test_and_validation_cells, Long_markers_list]
 
 load(paste0(work.dir, "/Good_trained_types.rda"))
 load(paste0(work.dir, "/Good_trained_pairs.rda"))
@@ -74,6 +87,33 @@ load(paste0(work.dir, "/Good_trained_pairs.rda"))
 #df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
 #colnames(df) <- c("Type", colnames(FACS.counts))
 #dim(df)
+cluster_label_id <- as.data.frame(unique(FACS.anno[,c("cluster_label", "cluster_id")]))
+FACS.anno <- as.data.frame(FACS.anno)
+rownames(FACS.anno) <- FACS.anno$sample_name
+load(paste0(work.dir, "/Test_GOOD_cells.rda"))
+load(paste0(work.dir, "/Test_BAD_cells.rda"))
+load(paste0(work.dir, "/validation_cells.rda"))
+sum(validation.cells %in% c(test.GOOD.cells, test.BAD.cells)) == 0
+sum(test.BAD.cells %in% c(test.GOOD.cells, validation.cells)) == 0
+sum(test.GOOD.cells %in% c(validation.cells, test.BAD.cells)) == 0
+test_and_validation_cells <- c(test.BAD.cells, test.GOOD.cells, validation.cells)
+
+load(paste0(work.dir, "/Good_trained_types.rda"))
+load(paste0(work.dir, "/Good_trained_pairs.rda"))
+
+FACS.anno <- FACS.anno[test_and_validation_cells,]
+colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ]  <- paste0("rename",colnames(FACS.counts)[grepl( "Rik" , colnames(FACS.counts)) ])
+colnames(FACS.counts) <- gsub("-", "_", colnames(FACS.counts))
+Long_markers_list[grepl( "Rik" , Long_markers_list)] <-  paste0("rename", Long_markers_list[grepl( "Rik" , Long_markers_list) ])
+Long_markers_list <- gsub("-", "_", Long_markers_list)
+FACS.counts <- FACS.counts[test_and_validation_cells, Long_markers_list]
+sum(rownames(FACS.anno) == rownames(FACS.counts)) == length(test_and_validation_cells)
+df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
+colnames(df) <- c("Type", colnames(FACS.counts))
+tmp<- rownames(df)
+df <- cbind.data.frame(lapply(df, as.integer))
+rownames(df) <- tmp
+dim(df)
 
 ##########################################################################################
 ### Some initialization: #################################################################
@@ -81,7 +121,7 @@ load(paste0(work.dir, "/Good_trained_pairs.rda"))
 
 genes <- Long_markers_list
 df <- t(df)
-load(paste0(work.dir, "/All_fit_values_1000_include47genes.rda"))
+load(paste0(work.dir, "/All_fit_values_4020.rda"))
 
 ##########################################################################################
 ### Setting RUN_ITER: ####################################################################
@@ -231,12 +271,13 @@ Finaldf[[cell]][order(Finaldf[[cell]][,"logp"], decreasing = TRUE),][1:10,]
 all_test_cells <- union(test.BAD.cells, test.GOOD.cells)
 validation.cells <- validation.cells
 contaminated.cells <- FACS.anno[FACS.anno$cluster_label %in% contaminated_types, "sample_name"]
+#contaminated.cells <- contaminated.cells$sample_name
 
 test_output <- list()
 validation_output <- list()
 done_test_cells <- c()
 done_validation_cells <- c()
-for (run_iter in 1:5089){
+for (run_iter in 1:5100){
   cell_name <- test_and_validation_cells[run_iter]
   file_name <- paste0(work.dir,   "ZINB_results_files/", cell_name,"_results.rda")
   if (file.exists(file_name)) {
@@ -288,55 +329,205 @@ cell_identity <- function(cell, test.BAD.cells, test.GOOD.cells, contaminated.ce
   if(cell %in% contaminated.cells){return(c("CONTAMIN"))}
 }
 
-prediction_identity <- function(output_1line, cellQ, validation_mean_logp){
+prediction_identity <- function(output_1line, cell, cellQ, validation_mean_logp){
+  Type1 <- as.character(output_1line$Type1) 
+  Type2 <- as.character(output_1line$Type2) 
+  cluster1 <- as.character(output_1line$cl1)
+  cluster2 <- as.character(output_1line$cl2)
+  label <- as.character(output_1line$cluster_label)
+  B <- output_1line$B
   if (cellQ == "PURE"){
-    if (output_1line$Type1 == output_1line$Type2 & output_1line$cl1 == output_1line$cluster_label){return(c("PURE_PURE_CORRECT"))}
-    if (output_1line$Type1 == output_1line$Type2 & output_1line$cl1 != output_1line$cluster_label){return(c("PURE_PURE_WRONG"))}
-    if (output_1line$Type1 != output_1line$Type2){return(c("PURE_CONTAMIN"))}
+    if (Type1 == Type2 & cluster1 %in% highQ_type){
+      if(cluster1 == label){
+        return(c(cell, Type1, Type2, cluster1, cluster2, B, label, "PURE_PURE_CORRECT"))
+      }else{
+        return(c(cell, Type1, Type2, cluster1, cluster2, B, label, "PURE_PURE_WRONG"))
+      }
+    }
+    if (Type1 != Type2){return(c(cell, Type1, Type2, cluster1, cluster2, B, label, "PURE_CONTAMIN"))}
   } else if (cellQ == "POORQ") {
-    if (output_1line$Type1 == output_1line$Type2){return(check_prediction_quality(cellQ, output_1line, validation_mean_logp))}
-    if (output_1line$Type1 != output_1line$Type2){return(c("POORQ_CONTAMIN"))}
+    if (Type1 == Type2 & cluster1 %in% highQ_type){
+      if (length(validation_mean_logp[validation_mean_logp$cluster_id == Type1, "min_logp"])!=0){
+              if (output_1line$logp >= validation_mean_logp[validation_mean_logp$cluster_id == Type1, "min_logp"]){
+                return(c(cell, Type1, Type2, cluster1, cluster2, B, label,"POORQ_PURE_CORRECT"))
+              } else {return(c(cell, Type1, Type2, cluster1, cluster2, B, label, "POORQ_PURE_WRONG"))}
+            }else{return(c(cell, Type1, Type2, cluster1, cluster2, B, label,NaN))}
+    }
+    if (Type1 != Type2){return(c(cell, Type1, Type2, cluster1, cluster2, B, label,"POORQ_CONTAMIN"))}
   } else if (cellQ == "CONTAMIN") {
-    if (output_1line$Type1 == output_1line$Type2){return(check_prediction_quality(cellQ, output_1line, validation_mean_logp))}
-    if (output_1line$Type1 != output_1line$Type2){return(c("CONTAMIN_CONTAMIN"))}
+    if (Type1 == Type2 & cluster1 %in% highQ_type){
+      if (length(validation_mean_logp[validation_mean_logp$cluster_id == Type1, "min_logp"])!=0){
+        if (output_1line$logp >= validation_mean_logp[validation_mean_logp$cluster_id == Type1, "min_logp"]){
+          return(c(cell, Type1, Type2, cluster1, cluster2, B, label,"CONTAMIN_PURE_CORRECT"))
+        } else {return(c(cell, Type1, Type2, cluster1, cluster2, B, label,"CONTAMIN_PURE_WRONG"))}
+      }else{return(c(cell, Type1, Type2, cluster1, cluster2, B, label,NaN))}  
+    }
+    if (Type1 != Type2){return(c(cell, Type1, Type2, cluster1, cluster2, B, label,"CONTAMIN_CONTAMIN"))}
   }
 }
 
-check_prediction_quality <- function(cellQ, output_1line, validation_mean_logp){
-  if (cellQ == "POORQ"){
-    if (!is_empty(validation_mean_logp[validation_mean_logp$cluster_id == output_1line$Type1, "min_logp"])){
-      if (output_1line$logp >= validation_mean_logp[validation_mean_logp$cluster_id == output_1line$Type1, "min_logp"]){
-        return(c("POORQ_PURE"))
-      } else {return(c("POORQ_POORQ"))}
-    }else{return(NaN)}
-  }
-  if (cellQ == "CONTAMIN"){
-    if (!is_empty(validation_mean_logp[validation_mean_logp$cluster_id == output_1line$Type1, "min_logp"])){
-      if (output_1line$logp >= validation_mean_logp[validation_mean_logp$cluster_id == output_1line$Type1, "min_logp"]){
-        return(c("CONTAMIN_PURE"))
-      } else {return(c("CONTAMIN_POORQ"))}
-    } else{return(NaN)}
-  }
-}
 
 prediction <- c()
 for (c in done_test_cells){
   cellQ <- cell_identity(c, test.BAD.cells, test.GOOD.cells, contaminated.cells)
   tmp <- test_output[[c]][order(test_output[[c]][,"logp"], decreasing = TRUE),][1,]
-  prediction <- c(prediction, prediction_identity(tmp, cellQ, validation_mean_logp))
+  prediction <- rbind(prediction, prediction_identity(tmp,c , cellQ, validation_mean_logp))
+}
+prediction <- as.data.frame(prediction)
+colnames(prediction) <- c( "sample_id", "Type1", "Type2","cl1", "cl2", "B", "cluster_label", "identity")
+
+sum(prediction$identity == "PURE_PURE_CORRECT") 
+sum(prediction$identity == "PURE_PURE_WRONG") 
+sum(prediction$identity == "PURE_CONTMAIN") 
+sum(prediction$identity == "POORQ_PURE_CORRECT")
+sum(prediction$identity == "POORQ_PURE_WRONG")
+sum(prediction$identity == "POORQ_CONTAMIN")
+sum(prediction$identity == "CONTAMIN_PURE_CORRECT")
+sum(prediction$identity == "CONTAMIN_PURE_WRONG")
+sum(prediction$identity == "CONTAMIN_CONTAMIN")
+
+study.cells <- done_test_cells[prediction$identity == "CONTAMIN_CONTAMIN"]
+for (c in study.cells){
+  tmp <- test_output[[c]][order(test_output[[c]][,"logp"], decreasing = TRUE),][1,]
+  print(c(as.character(tmp$cl1), as.character(tmp$cl2), tmp$B, tmp$cluster_label))
 }
 
-sum(prediction == "PURE_PURE_CORRECT") / sum(prediction == "PURE_PURE_CORRECT" | prediction == "PURE_PURE_WRONG" | prediction == "PURE_PURE_CONTAMIN")
-sum(prediction == "PURE_PURE_WRONG") / sum(prediction == "PURE_PURE_CORRECT" | prediction == "PURE_PURE_WRONG" | prediction == "PURE_PURE_CONTAMIN")
-sum(prediction == "POORQ_POORQ") / sum(prediction == "POORQ_POORQ" | prediction == "POORQ_PURE" | prediction == "POORQ_CONTAMIN")
-sum(prediction == "CONTAMIN_CONTAMIN") / sum(prediction == "CONTAMIN_PURE" | prediction == "CONTAMIN_POORQ" | prediction == "CONTAMIN_CONTAMIN")
+##########################################################################################
+### Reading in mapping results of FACS onto V1+ALM types: ################################
+##########################################################################################
+ref.data.rda.path = paste0("//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2/")
+load(paste0(ref.data.rda.path, "norm.dat.rda"))
+dim(norm.dat)
+norm.dat <- norm.dat[,rownames(FACS.anno)]
+load(paste0(work.dir, "V1_ALM_dend_markers_attached.rda") )
+load(paste0(work.dir, "/FACS_ALM_V1_TREE.rda"))
+load(paste0(work.dir, "/FACS_ALM_V1_TREE_mapping.df.rda"))
 
-temp <- c()
-for (c in done_test_cells[prediction == "POORQ_PURE"]) {
-  temp <- rbind(temp, test_output[[c]][order(test_output[[c]][,"logp"], decreasing = TRUE),][1,])
+cl <- setNames(FACS.anno$cl, FACS.anno$sample_name)
+cl <- factor(cl)
+cl.df <- unique(as.data.frame(FACS.anno[,c("cluster_id", "cluster_label", "cluster_color", "subclass_id", "subclass_label", "class_id", "class_label", "cl")]))
+rownames(cl.df) <- cl.df$cl
+cl.df <- cl.df[order(cl.df$cluster_id),]
+cl.df <- cl.df[cl.df$class_label!="Low Quality",]
+cl <- cl[cl%in% cl.df$cl]
+cl <- droplevels(cl)
+
+
+##########################################################################################
+### Comparing mapping and clustering results: ############################################
+##########################################################################################
+#FACS anno lables come from clustering
+#FACS.mapping.df is from mapping
+
+rownames(prediction) <- prediction$sample_id
+sum(rownames(FACS.anno) %in% rownames(FACS_Tree_mapping.df))
+FACS_Tree_memb <- FACS_Tree_memb[rownames(FACS_Tree_mapping.df),]
+sorted_cl <- t(apply(FACS_Tree_memb[ , labels(dend)], 1, function(x) names(x)[order(x, decreasing = TRUE)]))
+sorted_bt <- t(apply(FACS_Tree_memb[ , labels(dend)], 1, function(x) x[order(x, decreasing = TRUE)]))
+
+first_cl <- Renew_list(ls = sorted_cl[,1], ref.df = cl.df, label = "cl", new.label = "cluster_label")
+second_cl <- Renew_list(ls = sorted_cl[,2], ref.df = cl.df, label = "cl", new.label = "cluster_label")
+
+first_cl <- first_cl[rownames(FACS_Tree_mapping.df)] 
+second_cl <- second_cl[rownames(FACS_Tree_mapping.df)]
+
+first_bt <- sorted_bt[rownames(FACS_Tree_mapping.df),1]
+second_bt <- sorted_bt[rownames(FACS_Tree_mapping.df),2]
+  
+FACS_Tree_mapping.df <- cbind(FACS_Tree_mapping.df, first_cl, second_cl, first_bt, second_bt)
+
+study.cells <- done_test_cells[prediction$identity == "PURE_PURE_CORRECT" | prediction$identity == "PURE_PURE_WRONG" | prediction$identity == "PURE_PURE_CONTAMIN"]
+#Accuracy on the good cell, ZINB model accuarcy was 86%
+sum(FACS.anno[study.cells, "cluster_label"] == FACS_Tree_mapping.df[study.cells, "cluster_label"]) / length(study.cells)
+sum(as.character(FACS.anno[study.cells, "cluster_label"]) == FACS_Tree_mapping.df[study.cells, "first_cl"]) / length(study.cells)
+
+study.cells <- done_test_cells[prediction$identity == "POORQ_PURE_CORRECT" | prediction$identity == "POORQ_PURE_WRONG" | prediction$identity == "POORQ_CONTAMIN"]
+tmp <- cbind(FACS_Tree_mapping.df[study.cells, c("cluster_label", "first_cl", "second_cl", "first_bt", "second_bt") ], prediction[study.cells, c("cl1", "cl2", "B", "identity")])
+sum(FACS_Tree_mapping.df[study.cells, "cluster_label"] %in% highQ_type)
+
+study.cells <- done_test_cells[prediction$identity == "CONTAMIN_PURE_CORRECT" | prediction$identity == "CONTAMIN_PURE_WRONG" | prediction$identity == "CONTAMIN_CONTAMIN"]
+tmp <- cbind(FACS_Tree_mapping.df[study.cells, c("cluster_label", "first_cl", "second_cl", "first_bt", "second_bt") ], prediction[study.cells, c("cl1", "cl2", "B", "identity")])
+tmp[tmp$identity == "CONTAMIN_CONTAMIN",]
+
+##########################################################################################
+### D-contamination and new mapping: #####################################################
+##########################################################################################
+
+dim(prediction)
+prediction$Type1 <- as.numeric(prediction$Type1)
+prediction$Type2 <- as.numeric(prediction$Type2)
+prediction$B <- as.numeric(prediction$B)
+prediction <- prediction %>% mutate(Final_cl = ifelse(B > 0.5, cl1, cl2)) 
+
+genes <- Long_markers_list
+
+new_df <- c()
+for (c in (prediction$sample_id)) {
+  BB <- prediction[c, "B"]
+  contaminant <- ifelse( BB < 0.5, prediction[c, "Type1"], prediction[c, "Type2"])
+  y = df[genes, c]
+  new_y <- c()
+  for (g in genes) {
+    PP <- All_fit_values[[as.character(contaminant)]][,g][["Pi"]]
+    MM <- All_fit_values[[as.character(contaminant)]][,g][["Mu"]]
+    new_y[g] <- (1./ BB) * ( y[g] - (1 - BB) * (1 - PP) * MM) 
+  }
+  new_y[new_y<0] <- 0
+  new_df <- cbind(new_df, new_y)
 }
-temp 
 
-ggplot(melt(cbind(Good_test_cells, Bad_test_cells, contaminated_test_cells)), aes(value  , fill = Var2)) + 
-  geom_density(alpha = 0.5) + xlab("Min(logp) - predicted(logp)") + ylab("Density")
+colnames(new_df) <- as.character(prediction$sample_id)
+new_norm.dat <- log2(new_df+1)
+norm.dat <- norm.dat[,names(cl)] 
+norm.dat <- as.matrix(norm.dat)
 
+all_test_cells <- all_test_cells[all_test_cells %in% colnames(new_norm.dat)]
+#new_cl <- cl[all_test_cells]
+class(new_norm.dat)
+
+rownames(new_norm.dat)[grepl( "rename" , rownames(new_norm.dat)) ]  <- gsub("rename","",rownames(new_norm.dat)[grepl( "rename" , rownames(new_norm.dat)) ])
+rownames(new_norm.dat) <- gsub("_", "-", rownames(new_norm.dat))
+new_FACS_Tree_memb <- map_dend_membership(dend, cl= cl, norm.dat, new_norm.dat, colnames(new_norm.dat), bs.num=100, p=0.7, low.th=0.15)
+
+##########################################################################################
+### Comparing the mapping of contaminated and d-contaminated data: #######################
+##########################################################################################
+library(reshape2)
+study.cells <- contaminated.cells
+study.cells <- done_test_cells[prediction$identity == "CONTAMIN_CONTAMIN"]
+
+old_sorted_bt <- t(apply(FACS_Tree_memb[study.cells, labels(dend)], 1, function(x) x[order(x, decreasing = TRUE)]))
+old_first_bt <- old_sorted_bt[study.cells,1]
+old_second_bt <- old_sorted_bt[study.cells, 2]
+
+new_sorted_bt <- t(apply(new_FACS_Tree_memb[study.cells, labels(dend)], 1, function(x) x[order(x, decreasing = TRUE)]))
+new_first_bt <- new_sorted_bt[study.cells, 1]
+new_second_bt <- new_sorted_bt[study.cells, 2]
+
+old_sorted_cl <- t(apply(FACS_Tree_memb[study.cells, labels(dend)], 1, function(x) names(x)[order(x, decreasing = TRUE)]))
+old_first_cl <- old_sorted_cl[study.cells, 1]
+old_second_cl <- old_sorted_cl[study.cells, 2]
+old_first_cluster_label <- Renew_list(old_first_cl, cl.df, label = "cl", new.label = "cluster_label")
+
+new_sorted_cl <- t(apply(new_FACS_Tree_memb[study.cells, labels(dend)], 1, function(x) names(x)[order(x, decreasing = TRUE)]))
+new_first_cl <- new_sorted_cl[study.cells, 1]
+new_second_cl <- new_sorted_cl[study.cells, 2]
+new_first_cluster_label <- Renew_list(new_first_cl, cl.df, label = "cl", new.label = "cluster_label")
+
+tmp <- cbind.data.frame(old_first_bt, new_first_bt, old_second_bt, new_second_bt)
+tt <- melt(tmp)
+ggplot(tt[tt$variable %in% c("old_first_bt", "new_first_bt"),], aes (value, fill = variable)) +
+  geom_density(alpha=0.5)
+ggplot(tt[tt$variable %in% c("old_second_bt", "new_second_bt"),], aes (value, fill = variable)) +
+  geom_density(alpha=0.5)
+
+prediction_Type1 <- Renew_list(set_names(prediction$Type1, rownames(prediction)), ref.df = cl.df, label = "cluster_id", new.label = "cl")
+prediction_Type1<- prediction_Type1[study.cells]
+prediction_cluster_label1 <- set_names(prediction$Final_cl, prediction$sample_id)
+prediction_cluster_label1 <- prediction_cluster_label1[study.cells]
+
+tmp <- cbind.data.frame(old_first_cl, new_first_cl, prediction_Type1 )
+sum(tmp$old_first_cl == tmp$prediction_Type1)
+
+tmp <- cbind.data.frame(old_first_cluster_label, new_first_cluster_label, prediction_cluster_label1 )
+sum(tmp$old_first_cluster_label == tmp$prediction_cluster_label1 )
