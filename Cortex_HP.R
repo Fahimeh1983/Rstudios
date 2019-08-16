@@ -58,6 +58,8 @@ load("/allen/programs/celltypes/workgroups/rnaseqanalysis/yzizhen/joint_analysis
 cl.means_10X <- cl.means.list$`10X_cells`
 cl.means_smartseq <- cl.means.list$Smartseq_cells
 
+load(paste0(work.dir, "/dend_pruned_markers_attached.rda"))
+
 ##########################################################################################
 ### Some initialization: #################################################################
 ##########################################################################################
@@ -80,21 +82,17 @@ cl_smartseq_only <- droplevels(cl_smartseq_only)
 anno.df <- as.data.frame(anno.df)
 rownames(anno.df) <- anno.df$sample_name
 anno.df_TenX <- anno.df[TenX.cells,]
-tmp <- unique(anno.df_TenX$cl)
-labels <- as.character(Renew_list(tmp, ref.df = cl.df, label = "cl", new.label = "cluster_label"))
-tmp <- setdiff(tmp, tmp[which(is.na(labels))])
-labels <- setdiff(labels, labels[which(is.na(labels))])
-ref.labels <- setNames(labels, tmp)
+anno.df_TenX <- anno.df_TenX[anno.df_TenX$cl %in% labels(dend_pruned),]
 
 cl.mean <- do.call("cbind", tapply(anno.df_TenX$sample_name, 
                                    anno.df_TenX$cl, function(x)rowMeans(TenX.norm.dat[select.markers, x, drop=F])))
+
+save(cl.mean, file=paste0(work.dir, "/cl.mean.rda"))
+load(paste0(work.dir, "/cl.mean.rda"))
+
 matrix_cor <- cor(cl.mean[select.markers,], cl.mean[select.markers,])
-ref.labels[rownames(matrix_cor)]
-rownames(matrix_cor) <- ref.labels[rownames(matrix_cor)]
-colnames(matrix_cor) <- ref.labels[colnames(matrix_cor)]
-organized.cl <- cl.df$cluster_label
-organized.labels <- as.character(organized.cl[organized.cl %in% labels])
-matrix_cor <- matrix_cor[organized.labels, organized.labels]
+sorted_cl <- as.character(sort(as.numeric(rownames(matrix_cor))))
+matrix_cor <- matrix_cor[sorted_cl, sorted_cl]
 save(matrix_cor, file=paste0(work.dir, "/matrix_cor.rda"))
 
 library(reshape2)
@@ -108,7 +106,6 @@ ggplot(data = melt(matrix_cor), aes(x=Var1, y=Var2, fill=value)) +
 ### JSD: #################################################################################
 ##########################################################################################
 library("philentropy")
-
 t_prob <- TenX.norm.dat
 #norm.dat is log2(cpm+1) and we want the cpm data
 t_prob@x <- (2 ^ TenX.norm.dat@x) - 1
@@ -118,22 +115,18 @@ sep = sep[-1] - sep[-length(sep)]
 j = S4Vectors::Rle(1:length(sep), sep)
 t_prob@x = t_prob@x/sf[as.integer(j)]
 
-
-#t_prob <- as.matrix(t_prob)
-anno.df <- as.data.frame(anno.df)
-rownames(anno.df) <- anno.df$sample_name
-anno.df_TenX <- anno.df[TenX.cells,]
-
-
 cl.t.prob.mean <- do.call("cbind", tapply(anno.df_TenX$sample_name, 
                                           anno.df_TenX$cl, function(x)rowMeans(t_prob[, x, drop=F])))
-cl.t.prob.mean <- t(cl.t.prob.mean)
 
-matrix_JSD <- JSD(cl.t.prob.mean,  test.na = TRUE, unit = "log2", est.prob = NULL)
-rownames(matrix_JSD) <- ref.labels[rownames(cl.t.prob.mean)] 
-colnames(matrix_JSD) <- ref.labels[rownames(cl.t.prob.mean)]
-matrix_JSD <- matrix_JSD[organized.labels, organized.labels]
-save(matrix_JSD, file=paste0(work.dir, "/matrix_JSD_allgenes.rda"))
+save(cl.t.prob.mean, file=paste0(work.dir, "/cl.t.prob.mean.rda"))
+load(paste0(work.dir, "/cl.t.prob.mean.rda"))
+dim(cl.t.prob.mean)
+
+matrix_JSD <- JSD(cl.t.prob.mean[,select.markers],  test.na = TRUE, unit = "log2", est.prob = NULL)
+rownames(matrix_JSD) <- rownames(cl.t.prob.mean)
+colnames(matrix_JSD) <- rownames(cl.t.prob.mean)
+matrix_JSD <- matrix_JSD[sorted_cl, sorted_cl]
+save(matrix_JSD, file=paste0(work.dir, "/matrix_JSD_markergenes.rda"))
 
 library(reshape2)
 ggplot(data = melt(matrix_JSD), aes(x=Var1, y=Var2, fill=value)) + 
@@ -142,51 +135,40 @@ ggplot(data = melt(matrix_JSD), aes(x=Var1, y=Var2, fill=value)) +
   xlab("Clustering lable") + ylab("NN Mapping lables") +  
   scale_fill_gradient(low = "white", high = "red")
 
-load(paste0(work.dir, "/matrix_JSD_allgenes.rda"))
-matrix_JSD_all <- matrix_JSD
-rm(matrix_JSD)
 load(paste0(work.dir, "/matrix_JSD_markergenes.rda"))
-matrix_JSD_markers <- matrix_JSD
-rm(matrix_JSD)
 load(paste0(work.dir, "/matrix_cor.rda"))
 
-sorted_cor <- t(apply(matrix_cor, 1, function(x)x[order(x, decreasing = TRUE)]))
-sorted_cor_cl <- t(apply(matrix_cor, 1, function(x)names(x)[order(x, decreasing = TRUE)]))
 
-sorted_JSD_all <- t(apply(matrix_JSD_all, 1, function(x)x[order(x, decreasing = FALSE)]))
-sorted_JSD_all_cl <- t(apply(matrix_JSD_all, 1, function(x)names(x)[order(x, decreasing = FALSE)]))
-
-sorted_JSD_markers <- t(apply(matrix_JSD_markers, 1, function(x)x[order(x, decreasing = FALSE)]))
-sorted_JSD_markers_cl <- t(apply(matrix_JSD_markers, 1, function(x)names(x)[order(x, decreasing = FALSE)]))
-
-results <- cbind.data.frame(sorted_cor[,c(1,2,3)], sorted_cor_cl[,c(1,2,3)], 
-                            sorted_JSD_markers[,c(1,2,3)], sorted_JSD_markers_cl[,c(1,2,3)],
-                            sorted_JSD_all[,c(1,2,3)], sorted_JSD_all_cl[,c(1,2,3)])
-
-colnames(results) <- c("cor_score1", "cor_score2", "cor_score3",
-                       "cor_cl1", "cor_cl2", "cor_cl3",
-                       "JSD_markers_score1", "JSD_markers_score2",  "JSD_markers_score3",
-                       "JSD_markers_cl1", "JSD_markers_cl2", "JSD_markers_cl3",
-                       "JSD_all_score1", "JSD_all_score2",  "JSD_all_score3",
-                       "JSD_all_cl1", "JSD_all_cl2", "JSD_all_cl3")
-
-sum(results$cor_cl1 == results$JSD_markers_cl1) 
-sum(results$cor_cl2 == results$JSD_markers_cl2) 
-sum(results$cor_cl3 == results$JSD_markers_cl3) 
-
-sum(results$cor_cl1 == results$JSD_all_cl1) 
-sum(results$cor_cl2 == results$JSD_all_cl2) 
-sum(results$cor_cl3 == results$JSD_all_cl3) 
-
-temp <- matrix(matrix_cor, nrow = 404, ncol = 404) 
+temp <-  matrix_cor[upper.tri(matrix_cor, diag = FALSE)]
 tt1 <- as.vector(temp)
-tt2 <- sapply(tt1, function(x)match(x, sort(tt1, decreasing = TRUE)))
-ranked_cor_mat <- matrix(tt2, nrow = 404, ncol = 404)
+sorted_tt1 <- sort(tt1, decreasing = TRUE)
+tt2 <- sapply(tt1, function(x)match(x, sorted_tt1))
+ranked_cor_mat <- matrix(0, nrow = 383, ncol = 383)
+ranked_cor_mat[upper.tri(ranked_cor_mat, diag = FALSE)] <- tt2
+tt3 <- t(ranked_cor_mat)
+ranked_cor_mat[lower.tri(ranked_cor_mat, diag = FALSE)] <- tt3[lower.tri(tt3, diag = FALSE)]
 
-temp <- matrix(matrix_JSD, nrow = 404, ncol = 404) 
+
+temp <- matrix_JSD[upper.tri(matrix_JSD, diag = FALSE)]
 tt1 <- as.vector(temp)
-tt2 <- sapply(tt1, function(x)match(x, sort(tt1)))
-ranked_JSD_mat <- matrix(tt2, nrow = 404, ncol = 404)
+sorted_tt1 <- sort(tt1, decreasing = FALSE)
+tt2 <- sapply(tt1, function(x)match(x, sorted_tt1))
+ranked_JSD_mat <- matrix(0, nrow = 383, ncol = 383)
+ranked_JSD_mat[upper.tri(ranked_JSD_mat, diag = FALSE)] <- tt2
+tt3 <- t(ranked_JSD_mat)
+ranked_JSD_mat[lower.tri(ranked_JSD_mat, diag = FALSE)] <- tt3[lower.tri(tt3, diag = FALSE)]
+rownames(ranked_JSD_mat) <- seq(1:383)
+colnames(ranked_JSD_mat) <- seq(1:383)
+
+dist <- abs(ranked_JSD_mat-ranked_cor_mat)
+norm.dist <- dist/max(dist)
+
+ggplot(data = melt(norm.dist), aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()+ theme(axis.text = element_text(size=7)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  xlab("") + ylab("") +  
+  scale_fill_gradient(low = "white", high = "red")
+
 
 
 

@@ -40,7 +40,7 @@ tmp.load3 = load(file.path(res.dir, file=paste0("V1.dend.list", bp.name.add,".rd
 
 plot(dend)
 
-rownames(cl.df)=cl.df$cluster_id
+rownames(cl.df)=cl.df$cl
 cltmp=cl.df[as.character(cl),"cluster_label"]
 names(cltmp)=names(cl)
 cl=factor(cltmp)

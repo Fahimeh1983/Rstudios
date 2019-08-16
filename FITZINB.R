@@ -118,7 +118,38 @@ df <- cbind(FACS.anno$cluster_id, as.data.frame.matrix(FACS.counts))
 colnames(df) <- c("Type", colnames(FACS.counts))
 dim(df)
 
-
+##########################################################################################
+### Temporary: ###########################################################################
+##########################################################################################
+tmp <- list()
+load(paste0(work.dir,"/1_10.rda"))
+tmp <- All_fit_values
+load(paste0(work.dir, "/11_20.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/21_30.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/31_40.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/41_50.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/51_60.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/61_70.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/71_80.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/81_90.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/91_100.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/101_110.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/111_120.rda"))
+tmp <- c(tmp, All_fit_values)
+load(paste0(work.dir, "/121_130.rda"))
+tmp <- c(tmp, All_fit_values)
+All_fit_values <- tmp
+save(All_fit_values, file=paste0(work.dir, "/All_fit_values_4020.rda"))
 ##########################################################################################
 ### Some initialization: #################################################################
 ##########################################################################################
@@ -134,7 +165,7 @@ genes <- Long_markers_list
 source("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/git_workspace/Rstudios/Rstudios/ZINB_helper_functions.R")
 if (FIT_ZINB){
   All_fit_values <- list()
-  for (t in Good_types) {
+  for (t in Good_types[1]) {
     start_time = Sys.time()
     print(c("Type:", t))
     new_df <- df[df$Type == t ,]
@@ -143,7 +174,7 @@ if (FIT_ZINB){
     end_time = Sys.time()
     print(end_time - start_time)
   }
-  save(All_fit_values, file = paste0(work.dir, "/All_fit_values_1000_include47genes.rda"))
+  save(All_fit_values, file = paste0(work.dir, "/All_fit_values_4020.rda"))
 } else {
   load(paste0(work.dir, "/All_fit_values_1000_include47genes.rda"))
 }

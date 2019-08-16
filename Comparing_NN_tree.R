@@ -29,15 +29,16 @@ options(stringsAsFactors = F)
 ### Setting up the path dirs: ############################################################
 ##########################################################################################
 
-batch_date="20190227_BT014-RSC-195"
-patchseq.dir = paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_current/")
-facs.dir = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/facs_seq/mouse_V1_ALM_20180520/")
-robject.dir = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/patchseq/R_Object/")
-FACs.robject.dir = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/facs/R_Object/")
-ref.data.rda.path = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20180626_collapsed40_cpm/")
-select.markers.path = paste0(Where,"/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2.3.1/select.markers.rda")
-latest.mapping.memb.path = paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20190529_collapsed40_cpm/mapping.memb.with.bp.40.rda")
-latest.mapping.df.path = paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20190529_collapsed40_cpm/mapping.df.with.bp.40.rda")
+batch_date="20190722_BT014-RSC-215"
+patchseq.dir =  "/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_current/"
+facs.dir = "/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/facs_seq/mouse_V1_ALM_20180520/"
+robject.dir = "/allen/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/patchseq/R_Object/"
+FACs.robject.dir = "/allen/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/facs/R_Object/"
+ref.data.rda.path = "/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20180626_collapsed40_cpm/"
+select.markers.path = "/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2.3.1/select.markers.rda"
+latest.mapping.memb.path ="/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20190723_collapsed40_cpm/mapping.memb.with.bp.40.rda"
+latest.mapping.df.path ="/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20190723_collapsed40_cpm/mapping.df.with.bp.40.rda"
+work.dir <- "/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/Manuscript_patchseq_2019/"
 
 ##########################################################################################
 ### Reading REF FACS data, dend and markers list: ########################################
@@ -52,19 +53,35 @@ cl <- Renew_list(ls = cl, ref.df = cl.df, label = "cluster_id", new.label = "clu
 select.cl <- labels(dend)
 load(select.markers.path)
 
-##########################################################################################
-### Reading REF FACS data, dend and markers list: ########################################
-##########################################################################################
-batch_date="20190227_BT014-RSC-195"
-robject.dir = paste0(Where, "/programs/celltypes/workgroups/rnaseqanalysis/SMARTer/STAR/Mouse/patchseq/R_Object/")
-query.dat.norm = Get_patchseq_norm(cpm_rdata_path = paste0(robject.dir,batch_date,"_mouse_patchseq_star2.0_cpm.Rdata"),
-                                   samp_rdata_path = paste0(robject.dir,batch_date,"_mouse_patchseq_star2.0_samp.dat.Rdata"))
-patchseq_anno <- Read_patchseq_anno(paste0(patchseq.dir,"anno.feather"))
-dim(patchseq_anno)
+######################################################################################################
+### Loading the query data ###########################################################################
+######################################################################################################
 
+tmp<-load(paste0(robject.dir,batch_date,"_mouse_patchseq_star2.0_cpm.Rdata"))
+query.dat = cpmR
+
+# loading samp.dat object
+tmp<-load(paste0(robject.dir,batch_date,"_mouse_patchseq_star2.0_samp.dat.Rdata"))
+
+keepcells = which(samp.dat$Region=="VISp" & samp.dat$Type=="patch_seq")
+samp.dat = samp.dat[c(keepcells, which(samp.dat$Region=="TCx"),which(samp.dat$Region=="FCx"),which(samp.dat$Region=="MOp"),which(samp.dat$Region=="TEa")   ),]   #FCx is for Brian.  Rat samples mapped in mouse
+
+query.dat = query.dat[,as.character(samp.dat$exp_component_name)]
+colnames(query.dat)=as.character(samp.dat$patched_cell_container)
+
+query.dat.norm = log2(as.matrix(query.dat+1))
+idx=match(rownames(norm.dat), rownames(query.dat.norm))
+query.dat.norm=query.dat.norm[idx,]
+
+patchseq_anno <- Read_patchseq_anno(paste0(patchseq.dir,"anno.feather"))
+sum(select.markers %in% rownames(query.dat.norm))
+ 
 #Patchseq Cells of interests
-locked_cells_spec_id = rownames(read.csv("2018_mouse_met_dataset.csv", check.names=FALSE, row.names = 1 ))
+locked_cells_spec_id = rownames(read.csv(paste0(work.dir, "mouse_met_Jun_14.csv"), check.names=FALSE, row.names = 1 ))
 locked_cells_sample_id = patchseq_anno[patchseq_anno$spec_id_label %in% locked_cells_spec_id, "sample_id"]
+length(locked_cells_spec_id) == length(locked_cells_sample_id)
+dim(query.dat.norm[select.markers, locked_cells_sample_id])
+#write.csv(query.dat.norm, file=paste0(work.dir, "/query_dat_norm.csv"))
 
 ##########################################################################################
 ######################################## Mapping data using Tree #########################
@@ -73,12 +90,12 @@ locked_cells_sample_id = patchseq_anno[patchseq_anno$spec_id_label %in% locked_c
 set.seed(1983)
 #Patchseq_Tree_memb = map_dend_membership(dend, cl, norm.dat, query.dat.norm, colnames(query.dat.norm), bs.num=100, p=0.7, low.th=0.15)
 #Patchseq_Tree_mapping.df <- summarize_cl(dend, Patchseq_Tree_memb, query.dat.norm, conf.th=0.7, min.genes=1, min.genes.ratio=0.3)
-#save(Patchseq_Tree_mapping.df, file=file.path(paste0("Final_matrices/Patchseq_Tree_mapping.df", ".rda")))
-#save(Patchseq_Tree_memb, file=file.path(paste0("Final_matrices/Patchseq_Tree_mapping.memb",".rda")))
+#save(Patchseq_Tree_mapping.df, file=file.path(paste0("Final_matrices/Patchseq_Tree_mapping.df", ".rda"))
+#save(Patchseq_Tree_memb, file=file.path(paste0("Final_matrices/Patchseq_Tree_mapping.memb",".rda"))
 #Patchseq_Tree_memb <- Patchseq_Tree_memb[locked_cells_sample_id,]
 #Patchseq_Tree_mapping.df <- Patchseq_Tree_mapping.df[locked_cells_sample_id,]
-#save(Patchseq_Tree_mapping.df, file=file.path(paste0("Final_matrices_locked_data/Patchseq_Tree_mapping.df", ".rda")))
-#save(Patchseq_Tree_memb, file=file.path(paste0("Final_matrices_locked_data/Patchseq_Tree_mapping.memb",".rda")))
+#save(Patchseq_Tree_mapping.df, file=file.path(paste0("Final_matrices_locked_data/Patchseq_Tree_mapping.df", ".rda"))
+#save(Patchseq_Tree_memb, file=file.path(paste0("Final_matrices_locked_data/Patchseq_Tree_mapping.memb",".rda"))
 #load("Final_matrices_locked_data/AIM1.1/mapping.memb.rda")
 #load("Final_matrices_locked_data/AIM1.1/mapping.df.rda")
 load(latest.mapping.memb.path)
@@ -87,6 +104,8 @@ load(latest.mapping.df.path)
 Patchseq_Tree_mapping.df <- mapping.df
 rm(memb)
 rm(mapping.df)
+Patchseq_Tree_memb <- Patchseq_Tree_memb[locked_cells_sample_id,]
+Patchseq_Tree_mapping.df <- Patchseq_Tree_mapping.df[locked_cells_sample_id,]
 
 #Mapping FACS data
 FACs.cells <- colnames(norm.dat)
@@ -103,8 +122,8 @@ set.seed(1983)
 ### Read mapped NN results  ##############################################################
 ##########################################################################################
 
-Patchseq_NN_memb <- read.csv("NN_b_500000_500_patchseq_membership.csv", check.names=FALSE, row.names = 1)
-FACs_NN_memb <- read.csv("NN_b_500000_500_FACs_membership.csv" , check.names=FALSE, row.names = 1)
+Patchseq_NN_memb <- read.csv(paste0(work.dir, "/NN_10000epochs_batch500_patchseq_membership1.csv"), check.names=FALSE, row.names = 1)
+FACs_NN_memb <- read.csv(paste0(work.dir,"/NN_10000epochs_batch500_FACS_membership1.csv") , check.names=FALSE, row.names = 1)
 #Patchseq_NN_memb <- Patchseq_NN_memb[locked_cells_sample_id,]
 #save(Patchseq_NN_memb, file=file.path(paste0("Final_matrices_locked_data/Patchseq_NN_10_10000ephocs_500batch_mapping.memb",".rda")))
 
@@ -296,7 +315,8 @@ results <- cbind.data.frame(Tree_3_cls[cells,],
                             Tree_3_KL[cells,],
                             NN_3_KL[cells,],
                             Tree_3_cor[cells,],
-                            NN_3_cor[cells,])#,
+                            NN_3_cor[cells,],
+                            patchseq_anno[cells, c("topLeaf_id", "topLeaf_label", "topLeaf_color")])#,
 Original_cols <- colnames(results)
 
 results <- results %>% 
@@ -427,7 +447,22 @@ write.csv(I2_confusions,"/Shared_with_IVSCC/I2_type_confusion.csv")
 ##########################################################################################
 ### River plot ###########################################################################
 ##########################################################################################
+results <- results %>% rownames_to_column("sample_id")
+ref_color_label_id = unique(FACs_anno[,c("cluster_id","cluster_label", "cluster_color")])
 
+#ref_id <- data.frame(cluster_lable = select.cl, cluster_id = seq(93))
+#ref_color_label_id <- left_join(ref_color, ref_id)
+colnames(ref_color_label_id) <- c("Tree_first_cl_id", "Tree_first_cl", "Tree_firt_cl_color")
+dim(results)
+results <-  left_join(results, ref_color_label_id)
+colnames(ref_color_label_id) <- c("NN_first_cl_id", "NN_first_cl", "NN_firt_cl_color")
+results <- left_join(results, ref_color_label_id)
+dim(results)
+rownames(results) <- results$sample_id
+
+GABAcells <- locked_cells_sample_id[patchseq_anno[locked_cells_sample_id, "subclass_label"] %in% c("Vip", "Sst", "Pvalb", "Lamp5", "Sncg")]
+core_I1_GABAcells <- GABAcells[results[GABAcells, "Tree_call"] %in% c("Core", "I1") & results[GABAcells, "NN_call"] %in% c("Core", "I1")]
+  
 source(paste0( Where, "/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Plot_utils.R"))
 library(dplyr)
 
@@ -439,9 +474,9 @@ tmp <- results %>%
 
 river_plot(tmp, min.cells=0, min.frac=0)
 
-tmp <- results %>% 
+tmp <- results[core_I1_GABAcells,] %>% 
   rownames_to_column("id") %>% 
-  dplyr::select(id ,Tree_id, Tree_call, Tree_color, Old_id, Old_call, Old_color) %>%
+  dplyr::select(id , Tree_first_cl_id, Tree_first_cl, Tree_firt_cl_color, NN_first_cl_id, NN_first_cl, NN_firt_cl_color) %>%
   `colnames<-` (c("sample_id", "map_cluster_id", "map_cluster_label", 
                   "map_cluster_color", "cluster_id", "cluster_label", "cluster_color"))
 
@@ -496,7 +531,7 @@ river_plot(tmp, min.cells=0, min.frac=0)
 ############################################### PLOTS ####################################
 ##########################################################################################
 
-ggplot(data = melt(NN_mapping_probability[select.cl, select.cl]), aes(x=Var1, y=Var2, fill=value)) +
+ggplot(data = melt(Tree_mapping_probability[select.cl, select.cl]), aes(x=Var1, y=Var2, fill=value)) +
   geom_tile()+ theme(axis.text = element_text(size=5)) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
   xlab("clustering_cluster_label") + ylab("NN_mapping_cluster_label") +  
