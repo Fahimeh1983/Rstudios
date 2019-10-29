@@ -18,19 +18,87 @@ library(matrixStats)
 library(feather)
 library(Matrix)
 
-
-##########################################################################################
-### Reading inputs: ######################################################################
-##########################################################################################
 path.cortex.hp <- "/allen/programs/celltypes/workgroups/rnaseqanalysis/yzizhen/joint_analysis/Cortex_HIP/Cortex_HIP/"
 path.anno <- "/allen/programs/celltypes/workgroups/rnaseqanalysis/yzizhen/joint_analysis/Cortex_HIP/Cortex_HIP/correct/" 
 work.dir <- "/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/smartseq_10X_combined"
 
+##########################################################################################
+### Reading FACS calls: ##################################################################
+##########################################################################################
+# res.dir = "//allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/patch_seq/star/mouse_patchseq_VISp_20180626_collapsed40_cpm/"
+# tmp.load1 = load(file=file.path(res.dir, "ref.data.rda")) 
+# 
+# rownames(cl.df)=cl.df$cluster_id
+# cltmp=as.data.frame(cl.df[as.character(cl),c("cluster_label", "cluster_color", "cluster_id")])
+# rownames(cltmp)=paste0("Smartseq_cells.", names(cl))
+# FACS <- cltmp
+# #cl=factor(cltmp)
+# #FACS.cl <- cl
+# #FACS.cl.df <- cl.df
+# #FACS.dend <- dend
+# rm(cl)
+# rm(dend)
+# rm(cl.df)
+
+
+##########################################################################################
+### Comparing FACS with concensus clustering: ############################################
+##########################################################################################
+#cl file
+load(paste0(path.anno, "cl.final.rda"))
+length(cl)
+
+#anno file 
+load(paste0(path.anno, "anno.df.rda"))
+dim(anno.df)
+anno.df <- as.data.frame(anno.df)
+rownames(anno.df) <- anno.df$sample_name
+
+# FACS.cells <- names(FACS.cl)
+# FACS.cells <- paste0("Smartseq_cells.", FACS.cells)
+# All.smartseq.cells <- names(cl)[grepl("Smartseq", names(cl))]
+# 
+# FACS.cells <- FACS.cells[FACS.cells %in% All.smartseq.cells]
+# rownames(cl.df) = cl.df$cl
+# cltmp = as.data.frame(cl.df[as.character(cl),c("cluster_label", "cluster_id", "cluster_color")])
+# rownames(cltmp) = names(cl)
+# Smartseq.FACS <- cltmp[FACS.cells,]
+# FACS <- FACS[FACS.cells,]
+# colnames(FACS) <- c("old_cluster_label", "old_cluster_color", "old_cluster_id")
+# colnames(Smartseq.FACS) <- c("new_cluster_label","new_cluster_id", "new_cluster_color")
+# results <- cbind.data.frame(FACS, Smartseq.FACS)
+# anno.df <- anno.df[FACS.cells, ]
+# anno.df <- anno.df[anno.df$class_label == "GABAergic",]
+# GABA.cells <- rownames(anno.df)
+# unique(anno.df[GABA.cells, "subclass_label"])
+# Pvalb_Sst_cells <- GABA.cells[anno.df$subclass_label %in% c("Pvalb", "Sst", "Sst Chodl")]
+# Vip_Lamp5_cells <- GABA.cells[!anno.df$subclass_label %in% c("Pvalb", "Sst", "Sst Chodl")]
+# 
+# dim(results)
+# source("/allen//programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Plot_utils.R")
+# library(dplyr)
+# 
+# 
+# tmp <- results[Vip_Lamp5_cells,] %>% 
+#   rownames_to_column("id") %>% 
+#   dplyr::select(id, old_cluster_label, old_cluster_color, old_cluster_id, 
+#                 new_cluster_label, new_cluster_id, new_cluster_color) %>%
+#   `colnames<-` (c("sample_id", "map_cluster_label", "map_cluster_color", 
+#                   "map_cluster_id", "cluster_label", "cluster_id", "cluster_color"))
+# 
+# river_plot(tmp, min.cells=0, min.frac=0)
+
+##########################################################################################
+### Reading inputs: ######################################################################
+##########################################################################################
 #Downsampled 10X and smartseq norm.data 
 load(paste0(path.cortex.hp, "ref.dat.list.rda"))
 dim(ref.dat.list$`10X_cells`)
 dim(ref.dat.list$Smartseq_cells)
 norm.dat <- cbind(ref.dat.list$Smartseq_cells, ref.dat.list$`10X_cells`)
+
+Smartseq_cells <- colnames(norm.dat)[grepl("Smartseq_cells", colnames(norm.dat))]
+TenX_cells <- colnames(norm.dat)[grepl("10X_cells", colnames(norm.dat))]
 
 #DE genes for both 10X and smartseq
 load(paste0(path.cortex.hp, "comb.de.genes.rda"))
@@ -39,15 +107,6 @@ length(comb.de.genes)
 #markers
 load(paste0(path.cortex.hp, "select.markers.rda"))
 length(select.markers)
-
-#anno file 
-load(paste0(path.anno, "anno.df.rda"))
-dim(anno.df)
-
-#cl file
-load(paste0(path.anno, "cl.final.rda"))
-length(cl)
-
 
 #dend file
 #load(paste0(path.anno, "dend.rda"))
@@ -58,8 +117,6 @@ load("/allen/programs/celltypes/workgroups/rnaseqanalysis/yzizhen/joint_analysis
 cl.means_10X <- cl.means.list$`10X_cells`
 cl.means_smartseq <- cl.means.list$Smartseq_cells
 
-load(paste0(work.dir, "/dend_pruned_markers_attached.rda"))
-
 ##########################################################################################
 ### Some initialization: #################################################################
 ##########################################################################################
@@ -67,21 +124,169 @@ load(paste0(work.dir, "/dend_pruned_markers_attached.rda"))
 TenX.norm.dat <- ref.dat.list$`10X_cells`
 Smartseq.norm.dat <- ref.dat.list$Smartseq_cells
 
-TenX.cells <- colnames(TenX.norm.dat)
-Smartseq.cells <- colnames(Smartseq.norm.dat)
-
-cl_10X_only <- cl[TenX.cells]
+cl_10X_only <- cl[TenX_cells]
 cl_10X_only <- droplevels(cl_10X_only)
 
-cl_smartseq_only <- cl[Smartseq.cells]
+cl_smartseq_only <- cl[Smartseq_cells]
 cl_smartseq_only <- droplevels(cl_smartseq_only)
+
+##########################################################################################
+### Adding markers to the dend: ##########################################################
+##########################################################################################
+#We prune the dend based on 10X data
+missing_cl <- names(table(cl))[!names(table(cl)) %in% names(table(cl_10X_only))] 
+
+#Also all the types have less than 10cells should be removed???
+dend_pruned <- prune_dend(dend = dend, rm.labels = missing_cl)
+
+#We are going to add the markers based on both 10X and smartseq
+cl <- cl[colnames(norm.dat)]
+cl <- cl[cl %in% labels(dend_pruned)]
+cl <- droplevels(cl)
+
+tmp <- get_gene_score(comb.de.genes, top.n = 100, max.num = 2000, bin.th = 4)
+up.gene.score <- tmp$up.gene.score
+down.gene.score <- tmp$down.gene.score
+select.genes <- row.names(up.gene.score)
+n.markers = 30
+
+dend_pruned <- select_dend_markers(dend_pruned, norm.dat = norm.dat, cl = cl,
+                                   de.genes = comb.de.genes, up.gene.score = up.gene.score[select.genes,],
+                                   down.gene.score = down.gene.score[select.genes,], n.markers = n.markers)
+temp <- dend_pruned
+dend_pruned = select_pos_dend_markers(dend= dend_pruned, norm.dat = norm.dat, cl = cl)
+
+
+#save(dend, file =paste0(work.dir, "dend_markers_attached.rda"))
+save(dend_pruned, file =paste0(work.dir, "/dend_pruned_markers_attached.rda"))
+#load(paste0(work.dir, "/dend_pruned_markers_attached.rda"))
+#save(dend, file="/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2/Fahimeh_dend_markers_attached.rda")
+
+##########################################################################################
+### Loading the prunded dend: ############################################################
+##########################################################################################
+
+#load(paste0(work.dir, "/dend_pruned_markers_attached.rda"))
+
+##########################################################################################
+### Initialization: ######################################################################
+##########################################################################################
+
+select.cl <- labels(dend_pruned)
+TenX_cells <- names(cl_10X_only[cl_10X_only %in% labels(dend_pruned)]) 
+
+cl_10X_only <- cl_10X_only[TenX_cells]
+cl_10X_only <- droplevels(cl_10X_only)
+
+Smartseq_cells <- names(cl_smartseq_only[cl_smartseq_only %in% labels(dend_pruned)])
+cl_smartseq_only <- cl_smartseq_only[Smartseq_cells]
+cl_smartseq_only <- droplevels(cl_smartseq_only)
+
+#write.csv(as.matrix(TenX.norm.dat[select.markers,]), file = paste0(work.dir, "/TenX_norm_dat.csv"))
+#source("//allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/git_workspace/Rstudios/Rstudios/patchseq_10X.R")
+
+
+##########################################################################################
+### Mapping 10X on 10X: ##################################################################
+##########################################################################################
+TenX_test_cells <- sample(TenX_cells, 35000)
+TenX_train_cells <- setdiff(TenX_cells, TenX_test_cells)
+
+train.cl.med= do.call("cbind",tapply(names(cl_10X_only[TenX_test_cells]), cl_10X_only[TenX_test_cells], function(x){
+  rowMeans(as.matrix(norm.dat[,x,drop=F]))
+}))
+
+memb_tenx2tenx = map_dend_membership(dend_pruned, cl=cl_10X_only[TenX_train_cells], 
+                                     TenX.norm.dat[select.markers, TenX_train_cells], 
+                                     TenX.norm.dat[select.markers, TenX_test_cells], 
+                                     TenX_test_cells, bs.num=100, 
+                                     p=0.7, low.th=0.15, 
+                                     cl.mean = cl.means_10X[select.markers, select.cl])
+
+save(memb_tenx2tenx, file = paste0(work.dir, "/memb_tenx2tenx.rda"))
+
+
+##########################################################################################
+### 10X on 10X mapping performance: ######################################################
+##########################################################################################
+rownames(anno.df) <- anno.df$sample_name
+anno.df <- as.data.frame(anno.df)
+
+labels(dend_pruned)[!labels(dend_pruned) %in% colnames(memb_tenx2tenx)]
+cl.df[cl.df$cl == labels(dend_pruned)[!labels(dend_pruned) %in% colnames(memb_tenx2tenx)], "cluster_label"]
+mapped.cl <- colnames(memb_tenx2tenx)[colnames(memb_tenx2tenx) %in% labels(dend_pruned)]
+
+sorted_cl <- t(apply(memb_tenx2tenx[, mapped.cl], 1, function(x) names(x)[order(x, decreasing = TRUE)]))
+sorted_bt <- t(apply(memb_tenx2tenx[, mapped.cl], 1, function(x) x[order(x, decreasing = TRUE)]))
+
+sum(sorted_cl[TenX_test_cells,1] == cl_10X_only[TenX_test_cells]) / length(TenX_test_cells)
+
+Confusion_mat <- table(sorted_cl[TenX_test_cells,1], cl_10X_only[TenX_test_cells])
+Confusion_mat <- Confusion_mat/rowMaxs(Confusion_mat)
+  
+library(reshape2)
+ggplot(data = melt(Confusion_mat), aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()+ theme(axis.text = element_text(size=7)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  xlab("Clustering lable") + ylab("Mapping lables") +  
+  scale_fill_gradient(low = "white", high = "red")
+
+compare_annotate(cl=sorted_cl[TenX_test_cells,1], ref.cl = cl_10X_only[TenX_test_cells],ref.cl.df = cl.df , reorder = TRUE)
+
+##########################################################################################
+### Mapping Smartseq using 10X as ref: ###################################################
+##########################################################################################
+
+memb_smart2tenx = map_dend_membership(dend_pruned, cl=cl_10X_only, 
+                                      TenX.norm.dat[select.markers,], 
+                                      Smartseq.norm.dat[select.markers,], 
+                                      Smartseq_cells, bs.num=100, 
+                                      p=0.7, low.th=0.15, 
+                                      cl.mean = cl.means_10X[select.markers, select.cl])
+
+save(memb_smart2tenx, file = paste0(work.dir, "/memb_smart2tenx.rda"))
+#No cell was mapped to this cluster:
+labels(dend_pruned)[!labels(dend_pruned) %in% colnames(memb_smart2tenx)]
+cl.df[cl.df$cl == labels(dend_pruned)[!labels(dend_pruned) %in% colnames(memb_smart2tenx)], "cluster_label"]
+mapped.cl <- colnames(memb_smart2tenx)[colnames(memb_smart2tenx) %in% labels(dend_pruned)]
+
+#rownames(anno.df) <- anno.df$sample_name
+#anno.df <- as.data.frame(anno.df)
+sorted_cl <- t(apply(memb_smart2tenx[, mapped.cl], 1, function(x) names(x)[order(x, decreasing = TRUE)]))
+sorted_bt <- t(apply(memb_smart2tenx[, mapped.cl], 1, function(x) x[order(x, decreasing = TRUE)]))
+
+sum(as.character(anno.df[Smartseq_cells, "cl"]) == as.character(sorted_cl[Smartseq_cells,1])) / length(Smartseq_cells)
+sum(as.character(anno.df[Smartseq_cells, "cl"]) == as.character(sorted_cl[Smartseq_cells,2])) / length(Smartseq_cells)
+
+compare_annotate(cl=sorted_cl[Smartseq_cells,1], ref.cl = cl_smartseq_only[Smartseq_cells],ref.cl.df = cl.df , reorder = TRUE)
+
+##########################################################################################
+### Region comparison: ###################################################################
+##########################################################################################
+
+TenX_regions_freq <- as.data.frame(table(anno.df[anno.df$sample_name %in% TenX_cells,"joint_region_label"]))
+TenX_regions_freq$platform <- "10X"
+
+Smartseq_regions_freq <- as.data.frame(table(anno.df[anno.df$sample_name %in% Smartseq_cells,"joint_region_label"]))
+Smartseq_regions_freq$platform <- "Smartseq"
+
+left_join(TenX_regions_freq, Smartseq_regions_freq, by= "Var1")
+
+tmp <- rbind.data.frame(TenX_regions_freq, Smartseq_regions_freq)
+
+ggplot(tmp,aes(x=Var1,y=Freq,fill=platform))+
+  geom_bar(stat="identity",position="dodge") +
+  xlab("Region")+ylab("Number of cells") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
 
 ##########################################################################################
 ### cor: #################################################################################
 ##########################################################################################
 anno.df <- as.data.frame(anno.df)
 rownames(anno.df) <- anno.df$sample_name
-anno.df_TenX <- anno.df[TenX.cells,]
+anno.df_TenX <- anno.df[TenX_cells,]
 anno.df_TenX <- anno.df_TenX[anno.df_TenX$cl %in% labels(dend_pruned),]
 
 cl.mean <- do.call("cbind", tapply(anno.df_TenX$sample_name, 
@@ -169,103 +374,6 @@ ggplot(data = melt(norm.dist), aes(x=Var1, y=Var2, fill=value)) +
   xlab("") + ylab("") +  
   scale_fill_gradient(low = "white", high = "red")
 
-
-
-
-
-##########################################################################################
-### Adding markers to the dend: ##########################################################
-##########################################################################################
-#We prune the dend based on 10X data
-missing_cl <- names(table(cl))[!names(table(cl)) %in% names(table(cl_10X_only))] 
-dend_pruned <- prune_dend(dend = dend, rm.labels = missing_cl)
-
-#We are going to add the markers based on both 10X and smartseq
-cl <- cl[colnames(norm.dat)]
-cl <- cl[cl %in% labels(dend_pruned)]
-cl <- droplevels(cl)
-
-tmp <- get_gene_score(comb.de.genes, top.n = 100, max.num = 2000, bin.th = 4)
-up.gene.score <- tmp$up.gene.score
-down.gene.score <- tmp$down.gene.score
-select.genes <- row.names(up.gene.score)
-n.markers = 30
-
-dend_pruned <- select_dend_markers(dend_pruned, norm.dat = norm.dat, cl = cl,
-                    de.genes = comb.de.genes, up.gene.score = up.gene.score[select.genes,],
-                    down.gene.score = down.gene.score[select.genes,], n.markers = n.markers)
-temp <- dend_pruned
-dend_pruned = select_pos_dend_markers(dend= dend_pruned, norm.dat = norm.dat, cl = cl)
-
-
-#save(dend, file =paste0(work.dir, "dend_markers_attached.rda"))
-#save(dend_pruned, file =paste0(work.dir, "dend_pruned_markers_attached.rda"))
-load(paste0(work.dir, "/dend_pruned_markers_attached.rda"))
-#save(dend, file="/allen/programs/celltypes/workgroups/rnaseqanalysis/shiny/Taxonomies/AIT2/Fahimeh_dend_markers_attached.rda")
-
-##########################################################################################
-### Initialization: ######################################################################
-##########################################################################################
-
-select.cl <- labels(dend_pruned)
-TenX.cells <- names(cl_10X_only[cl_10X_only %in% labels(dend_pruned)]) 
-
-cl_10X_only <- cl_10X_only[TenX.cells]
-cl_10X_only <- droplevels(cl_10X_only)
-
-Smartseq.cells <- names(cl_smartseq_only[cl_smartseq_only %in% labels(dend_pruned)])
-cl_smartseq_only <- cl_smartseq_only[Smartseq.cells]
-cl_smartseq_only <- droplevels(cl_smartseq_only)
-
-#write.csv(as.matrix(TenX.norm.dat[select.markers,]), file = paste0(work.dir, "/TenX_norm_dat.csv"))
-#source("//allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/git_workspace/Rstudios/Rstudios/patchseq_10X.R")
-
-##########################################################################################
-### Mapping Smartseq using 10X as ref: ###################################################
-##########################################################################################
-
-memb_smart2tenx = map_dend_membership(dend_pruned, cl=cl_10X_only, 
-                                      TenX.norm.dat[select.markers,], 
-                                      Smartseq.norm.dat[select.markers,], 
-                                      Smartseq.cells, bs.num=100, 
-                                      p=0.7, low.th=0.15, 
-                                      cl.mean = cl.means_10X[select.markers, select.cl])
-
-#save(memb_smart2tenx, file = paste0(work.dir, "memb_smart2tenx.rda"))
-#No cell was mapped to this cluster:
-labels(dend_pruned)[!labels(dend_pruned) %in% colnames(memb_smart2tenx)]
-cl.df[cl.df$cl == labels(dend_pruned)[!labels(dend_pruned) %in% colnames(memb_smart2tenx)], "cluster_label"]
-mapped.cl <- colnames(memb_smart2tenx)[colnames(memb_smart2tenx) %in% labels(dend_pruned)]
-
-rownames(anno.df) <- anno.df$sample_name
-anno.df <- as.data.frame(anno.df)
-sorted_cl <- t(apply(memb_smart2tenx[, mapped.cl], 1, function(x) names(x)[order(x, decreasing = TRUE)]))
-sorted_bt <- t(apply(memb_smart2tenx[, mapped.cl], 1, function(x) x[order(x, decreasing = TRUE)]))
-
-first_cl <- sorted_cl[,1]
-second_cl <- sorted_cl[,2]
-first_cluster_label <- Renew_list(first_cl, ref.df = cl.df, label = "cl", new.label = "cluster_label")
-second_cluster_label <- Renew_list(second_cl, ref.df = cl.df, label = "cl", new.label = "cluster_label")
-
-sum(as.character(anno.df[Smartseq.cells, "cluster_label"]) == as.character(first_cluster_label[Smartseq.cells])) / length(Smartseq.cells)
-sum(as.character(anno.df[Smartseq.cells, "cl"]) == as.character(first_cl[Smartseq.cells])) / length(Smartseq.cells)
-sum(as.character(anno.df[Smartseq.cells, "cluster_label"]) == as.character(second_cluster_label[Smartseq.cells])) / length(Smartseq.cells)
-sort(table(first_cluster_label))
-
-##########################################################################################
-### Mapping 10X on 10X: ##################################################################
-##########################################################################################
-TenX_test_cells <- sample(TenX.cells, 35000)
-TenX_train_cells <- setdiff(TenX.cells, TenX_test_cells)
-
-memb_tenx2tenx = map_dend_membership(dend_pruned, cl=cl_10X_only[TenX_train_cells], 
-                                      TenX.norm.dat[select.markers, TenX_train_cells], 
-                                      TenX.norm.dat[select.markers, TenX_test_cells], 
-                                      TenX_test_cells, bs.num=100, 
-                                      p=0.7, low.th=0.15, 
-                                      cl.mean = cl.means_10X[select.markers, select.cl])
-
-save(memb_tenx2tenx, file = paste0(work.dir, "/memb_tenx2tenx.rda"))
 
 ##########################################################################################
 ### Mapping smartseq on smartseq: ########################################################

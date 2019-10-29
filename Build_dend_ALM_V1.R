@@ -1,4 +1,6 @@
 library(scrattch.hicat)
+library(feather)
+library(dplyr)
 source(paste0("/allen/programs/celltypes/workgroups/rnaseqanalysis/Fahimehb/MY_R/Utils.R"))
 source("/allen/programs/celltypes/workgroups/rnaseqanalysis/yzizhen/My_R/scrattch.hicat/R/dend.markers.R")
 source("/allen/programs/celltypes/workgroups/rnaseqanalysis/yzizhen/My_R/scrattch.hicat/R/markers.R")
@@ -21,6 +23,14 @@ anno.path = "/data/rnaseqanalysis/shiny/facs_seq/mouse_V1_ALM_20180520/anno.feat
 load(paste0(ref.data.rda.path, "norm.dat.rda"))
 load(paste0(ref.data.rda.path, "Tasic_2018_dend.rda"))
 FACS.anno <- read_feather(anno.path)
+
+# For making the tree for VISp cells 
+FACS.anno <- as.data.frame(FACS.anno) %>% 
+  filter(region_label == "VISp") %>% 
+  filter(!grepl("ALM", cluster_label)) %>% 
+  filter(class_label !="Low Quality")
+dim(FACS.anno)
+
 rownames(FACS.anno) <- FACS.anno$sample_id
 cl <- setNames(FACS.anno$cl, FACS.anno$sample_id)
 cl <- factor(cl)
@@ -59,12 +69,15 @@ down.gene.score=tmp$down.gene.score
 select.genes = row.names(up.gene.score)
 #load(paste0(workdir, "V1_ALM_dend_markers_attached.rda"))
 n.markers = 30 # use up to 30 markers per node
-labels(dend)[!labels(dend) %in% cl.df$cluster_label]
-labels(dend)[41] <- "L6 CT Nxph2 Sla"
-labels(dend)[48] <- "L6b Col8a1 Rprm"
-labels(dend) = row.names(cl.df)[match(labels(dend),cl.df$cluster_label)]
 
-dend = select_dend_markers(dend, norm.dat=norm.dat, cl=cl, de.genes=de.genes,
+labels(dend)[48] <- "L6b Col8a1 Rprm"
+missing_labels <- labels(dend)[!labels(dend) %in% cl.df$cluster_label]
+dend_pruned <- prune_dend(dend = dend, rm.labels = missing_labels)
+#labels(dend)[41] <- "L6 CT Nxph2 Sla"
+
+#labels(dend) = row.names(cl.df)[match(labels(dend),cl.df$cluster_label)]
+
+dend = select_dend_markers(dend_pruned, norm.dat=norm.dat, cl=cl, de.genes=de.genes,
                            up.gene.score=up.gene.score[select.genes,], 
                            down.gene.score=down.gene.score[select.genes,], n.markers=n.markers)
 dend = select_pos_dend_markers(dend= dend, norm.dat = norm.dat, cl = cl)

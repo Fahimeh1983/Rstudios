@@ -402,7 +402,7 @@ Modify_layer_label_GABAcells <- function(GABAanno) {
                                            structure_label %in% L4 ~ "VISp4", 
                                            structure_label %in% L5 ~ "VISp5",
                                            structure_label %in% L6a ~ "VISp6a",
-                                           structure_label %in% L6a ~ "VISp6a",
+                                           structure_label %in% L6b ~ "VISp6b",
                                            structure_label %in% L1_ho ~ "VIS1_ho",
                                            structure_label %in% L23_ho ~ "VIS23_ho",
                                            structure_label %in% L4_ho ~ "VIS4_ho",
@@ -440,6 +440,168 @@ Modify_layer_label_GABAcells <- function(GABAanno) {
   GABAanno 
 }
 
+build_dotplot_comparison_FACS_patch_plot <- function(facs.anno,
+                                                      patch.anno,
+                                                      dend,
+                                                      dendcluster_ids,
+                                                      seed_val = 42,
+                                                      right_pad = 10){
+  
+  facs.anno <- as.data.frame(facs.anno)
+  patch.anno <- as.data.frame(patch.anno)
+  patch.ho.keep_layers <- c("VIS1_ho", "VIS23_ho", "VIS4_ho", "VIS5_ho", "VIS6_ho")
+  patch.keep_layers <- c("VISp1", "VISp2/3", "VISp4", "VISp5","VISp6")
+  facs.keep_layers <- c("L1","L2/3","L4","L5","L6")
+  
+  xpad <- 0.1
+  ypad <- 0.05
+
+  patch.anno$layer_label <- patch.anno$Revisited_layer_label
+  patch.anno$layer_id <- patch.anno$Revisited_layer_id
+  patch.anno$layer_color <- patch.anno$Revisited_layer_color
+  
+  facs.filtered_anno <- facs.anno %>%
+    filter(dendcluster_id %in% dendcluster_ids) %>%
+    filter(layer_label %in% facs.keep_layers)
+  
+  patch.filtered_anno <- patch.anno %>%
+    filter(dendcluster_id %in% dendcluster_ids) %>%
+    filter(layer_label %in% patch.keep_layers)
+  
+  #Layer range is the same for both patch and facs
+  facs.layer_ranges <- data.frame(layer_label = rev(facs.keep_layers),
+                                  ymin = seq(1, 3, by=0.5) -1 + ypad,
+                                  ymax = seq(1, 3, by=0.5) -0.5 - ypad) %>% mutate(ymid = (ymin + ymax)/2) 
+  
+  patch.layer_ranges <- data.frame(layer_label = rev(patch.keep_layers),
+                                   ymin = seq(1, 3, by=0.5) -1 + ypad,
+                                   ymax = seq(1, 3, by=0.5) -0.5 - ypad) %>% mutate(ymid = (ymin + ymax)/2) 
+  
+  facs.cluster_ranges <- facs.filtered_anno %>%
+    select(cluster_id, cluster_color, cluster_label, dendcluster_id) %>%
+    unique() %>%
+    arrange(dendcluster_id) %>%
+    mutate(xmin = 1:n() - 1 + xpad,
+           xmax = 1:n()     - xpad,
+           xmid = 1:n() - 0.5) 
+  
+
+  set.seed(seed_val)
+  
+  dim(facs.filtered_anno)
+  dim(patch.filtered_anno)
+  
+  facs.plot_data <- as.data.frame(facs.filtered_anno %>%
+                                    select(sample_id,
+                                           dendcluster_id, cluster_color, cluster_label,
+                                           layer_id, layer_color, layer_label) %>%
+                                    left_join(facs.layer_ranges) %>%
+                                    left_join(facs.cluster_ranges) %>%
+                                    group_by(dendcluster_id, layer_id, xmid, ymid) %>%
+                                    mutate(ly_n = n()) %>%
+                                    ungroup() %>%
+                                    group_by(dendcluster_id) %>%
+                                    arrange(layer_id) %>%
+                                    mutate(cluster_n = n(),
+                                           ly_frac = ly_n/cluster_n))
+
+  patch.plot_data <- as.data.frame(patch.filtered_anno %>%
+                                     select(sample_id,
+                                            dendcluster_id, cluster_color, cluster_label,
+                                            layer_id, layer_color, layer_label) %>%
+                                     left_join(patch.layer_ranges) %>%
+                                     left_join(facs.cluster_ranges) %>%
+                                     group_by(dendcluster_id, layer_id, xmid, ymid) %>%
+                                     mutate(ly_n = n()) %>%
+                                     ungroup() %>%
+                                     group_by(dendcluster_id) %>%
+                                     arrange(layer_id) %>%
+                                     mutate(cluster_n = n(),
+                                            ly_frac = ly_n/cluster_n))  
+  
+  
+  # Layer background rectangles
+  #layer.rect.colors <- c("#ECE09C","#ECE09C", "#ECE09C","#ECE09C", "#ECE09C", "#ECE09C")
+  #layer.rect.colors <- c("#ECE09C","#ECE09C", "#ECE09C","#ECE09C", "#ECE09C")
+
+  facs.layer_rects <- data.frame()
+  i = 1
+  for (l in facs.keep_layers) {
+    print(l)
+    tmp <- facs.cluster_ranges %>% select(cluster_label,xmin, xmax) %>% 
+      mutate(xmin = facs.cluster_ranges$xmin , 
+             xmax = facs.cluster_ranges$xmax ,
+             layer_label = l) %>% 
+      left_join(facs.layer_ranges)
+    tmp$fill <- rep(c("#E0E0E0", "#FFFFFF"), dim(facs.cluster_ranges)[1])[1:dim(facs.cluster_ranges)[1]]
+    facs.layer_rects <- rbind.data.frame(facs.layer_rects, tmp)
+    i <- i+1
+  }
+  
+  #patch.layer_rects <- facs.layer_rects %>% mutate(xmin = xmin +1,
+  #                                                 xmax = xmax +1)
+  
+  # Cluster color highlights at bottom of the plot
+  cluster_rects <- facs.cluster_ranges %>%
+    mutate(ymin = -ypad, ymax = ypad)
+  
+  pad_rect <- data.frame(ymin = min(facs.layer_rects$ymin),
+                         ymax = max(facs.layer_rects$ymax),
+                         xmin = max(facs.layer_rects$xmax),
+                         xmax = max(facs.layer_rects$xmax) + max(facs.layer_rects$xmax)*(right_pad/100)/(1 - right_pad/100))
+  
+  p <- ggplot() +
+    # right side padding for alignment
+    geom_rect(data = pad_rect,
+              aes(xmin = xmin, xmax = xmax,
+                  ymin = ymin, ymax = ymax,
+                  fill = "#FFFFFF",
+                  color = "#FFFFFF")) +
+    # layer background rectangles
+    geom_rect(data = facs.layer_rects,
+              aes(xmin = xmin, xmax = xmax,
+                  ymin = ymin, ymax = ymax,
+                  fill = fill)) +
+    geom_point(data = facs.plot_data,
+               aes(x = xmid - 0.2,
+                   y = ymid,
+                   color = "#0000CC",
+                   size = ly_frac)) +
+    geom_point(data = patch.plot_data,
+               aes(x = xmid + 0.2,
+                   y = ymid,
+                   color = "#FF0000",
+                   size = ly_frac)) +
+    # cluster name labels
+    geom_rect(data = facs.cluster_ranges,
+              aes(xmin = xmid - 0.5 + xpad/2,
+                  xmax = xmid + 0.5 - xpad/2 ,
+                  ymax = 0 - ypad,
+                  ymin = -2),
+              fill = "#CCE5FF")+
+    geom_text(data = facs.cluster_ranges,
+              aes(x = xmid,
+                  y = -2 + ypad,
+                  label = cluster_label),
+              angle = 90,
+              vjust = 0.3,
+              hjust = 0,
+              size = 4) +
+    # Plot settings
+    scale_color_identity() +
+    scale_size_area(max_size = 5,
+                    breaks = c(1,10,50,100,200,500)) +
+    #scale_size(range = c(0.5,1), guide = FALSE) +
+    scale_fill_identity() +
+    scale_y_continuous(limits = c(-2.1, 4)) +
+    scale_x_continuous(expand = c(0,0)) +
+    theme_void(base_size = 7) +
+    theme(text = element_text(size = 6),
+          legend.box.spacing = unit(0,"pt"))
+  
+  p
+}
+
 build_layer_comparison_FACS_patch_plot <- function(facs.anno,
                                                    patch.anno,
                                                    dend,
@@ -448,9 +610,12 @@ build_layer_comparison_FACS_patch_plot <- function(facs.anno,
                                                    right_pad = 10) {
   facs.anno <- as.data.frame(facs.anno)
   patch.anno <- as.data.frame(patch.anno)
-  patch.ho.keep_layers <- c("VIS1_ho", "VIS23_ho", "VIS4_ho", "VIS5_ho", "VIS6a_ho", "VIS6b_ho")
-  patch.keep_layers <- c("VISp1", "VISp2/3", "VISp4", "VISp5","VISp6a" ,"VISp6b")
-  facs.keep_layers <- c("L1","L2/3","L4","L5","L6", "L6b")
+  #patch.ho.keep_layers <- c("VIS1_ho", "VIS23_ho", "VIS4_ho", "VIS5_ho", "VIS6a_ho", "VIS6b_ho")
+  #patch.keep_layers <- c("VISp1", "VISp2/3", "VISp4", "VISp5","VISp6a" ,"VISp6b")
+  #facs.keep_layers <- c("L1","L2/3","L4","L5","L6", "L6b")
+  patch.ho.keep_layers <- c("VIS1_ho", "VIS23_ho", "VIS4_ho", "VIS5_ho", "VIS6_ho")
+  patch.keep_layers <- c("VISp1", "VISp2/3", "VISp4", "VISp5","VISp6")
+  facs.keep_layers <- c("L1","L2/3","L4","L5","L6")
   
   xpad <- 0.1
   ypad <- 0.05
@@ -469,12 +634,12 @@ build_layer_comparison_FACS_patch_plot <- function(facs.anno,
   
   #Layer range is the same for both patch and facs
   facs.layer_ranges <- data.frame(layer_label = rev(facs.keep_layers),
-                             ymin = (1:6 - 1) + ypad,
-                             ymax = (1:6) - ypad)
+                             ymin = (1:5 - 1) + ypad,
+                             ymax = (1:5) - ypad)
   
   patch.layer_ranges <- data.frame(layer_label = rev(patch.keep_layers),
-                                  ymin = (1:6 - 1) + ypad,
-                                  ymax = (1:6) - ypad)
+                                  ymin = (1:5 - 1) + ypad,
+                                  ymax = (1:5) - ypad)
   
   facs.cluster_ranges <- facs.filtered_anno %>%
     select(cluster_id, cluster_color, cluster_label, dendcluster_id) %>%
@@ -524,6 +689,7 @@ build_layer_comparison_FACS_patch_plot <- function(facs.anno,
   # Layer background rectangles
   #layer.rect.colors <- c("#C1E5E7","#C1E5E7", "#FDE4DF","#ECE09C", "#F7F2DA", "#A7D7DF")
   layer.rect.colors <- c("#ECE09C","#ECE09C", "#ECE09C","#ECE09C", "#ECE09C", "#ECE09C")
+  layer.rect.colors <- c("#ECE09C","#ECE09C", "#ECE09C","#ECE09C", "#ECE09C")
   #layer.rect.colors <- c("#000000","#000000", "#000000","#ECE09C", "#ECE09C", "#ECE09C")
   
   facs.layer_rects <- data.frame()
